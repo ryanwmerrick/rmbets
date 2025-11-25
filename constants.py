@@ -13,7 +13,7 @@ ACTIVE_SPORTS = {
     "americanfootball_nfl": "NFL",
     "icehockey_nhl": "NHL",
     "soccer_epl": "EPL",
-    "soccer_uefa_champs_league": "UCL"
+    "soccer_uefa_champs_league": "UEFA Champions League"
 }
 
 REGIONS = "us"

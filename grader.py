@@ -119,16 +119,40 @@ def grade_pick(pick, result_data):
 
     # LOGIC 3: MONEYLINE
     else:
-        sel_norm = selection.strip().lower()
-        home_norm = result_data['home_team'].lower()
+        # Check for the third outcome: DRAW
+        is_draw = h_score == a_score
         
-        picked_home = sel_norm in home_norm
-        home_won = h_score > a_score
+        # 1. Check if the selection was explicitly for a DRAW
+        if "draw" in pick.selection.lower():
+            return "WIN" if is_draw else "LOSS"
         
-        if picked_home:
-            return "WIN" if home_won else "LOSS"
+        # 2. Check for a Team Win (Standard Logic)
+        # This will ONLY run if the game was NOT a draw (or if the bet was explicitly NOT a draw)
+        
+        # The game must be resolved (not a draw) for a team bet to WIN/LOSS.
+        if not is_draw:
+            # We use string matching to be robust against "LA Lakers" vs "Lakers"
+            picked_team = pick.selection.lower()
+            home_team_name = result_data['home_team'].lower()
+            away_team_name = result_data['away_team'].lower()
+            
+            home_won= h_score>a_score
+
+            # Determine the outcome of the bet
+            if picked_team in home_team_name:
+                return "WIN" if home_won else "LOSS"
+            elif picked_team in away_team_name:
+                return "WIN" if not home_won else "LOSS"
+            else:
+                # If we couldn't match the team name to the score result data, skip the grade
+                return None 
+        
+        # 3. If the pick was a TEAM but the game was a DRAW, the bet is a LOSS.
         else:
-            return "WIN" if not home_won else "LOSS"
+            return "LOSS"
+
+    return None # Could not grade
+        
 
 def run_grader():
     print("--- STARTING GRADER ---")
@@ -142,8 +166,6 @@ def run_grader():
 
 
         # 1. CREATE REVERSE MAPPING (DB Name -> API Key)
-        # ACTIVE_SPORTS is {"basketball_nba": "NBA"}
-        # We need {"NBA": "basketball_nba"}
         db_to_api = {v: k for k, v in ACTIVE_SPORTS.items()}
         
         # 2. IDENTIFY NEEDED API KEYS
