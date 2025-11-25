@@ -127,6 +127,11 @@ def format_game_data(game):
             
         elif market['key'] == 'totals':
             p = format_american_odds(market['outcomes'][0]['price'])
+            point = market['outcomes'][0]['point']
+            if point > 0:
+                point_str = f"+{point}"
+            else:
+                point_str = str(point)
             lines.append(f"Total: {market['outcomes'][0]['name']} {market['outcomes'][0]['point']} ({p})")
     
     return {
@@ -274,9 +279,17 @@ def run_ingest():
         print(f"\n--- Analysis Complete. Found {len(all_potential_bets)} total opportunities. ---")
         print("--- Filtering for Top 9 Best Bets ---")
         
-        #sorts bets by value edge
-        sorted_bets = sorted(all_potential_bets, key=lambda x: x.get('value_edge', 0), reverse=True)
-        
+       # Filter: Create a new list containing only 'Medium' or 'High' confidence scores.
+        high_confidence_bets = [
+                bet for bet in all_potential_bets 
+                if bet.get('confidence_score') in ['Medium', 'High']
+        ]
+        # Sort: Now sort the filtered list by 'value_edge'.
+        sorted_bets = sorted(
+            high_confidence_bets, 
+            key=lambda x: x.get('value_edge', 0), 
+            reverse=True
+        )
         top_9_bets = sorted_bets[:9]
         
         for bet in top_9_bets:

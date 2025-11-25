@@ -100,14 +100,10 @@ def stats():
 
 @app.route('/about')
 def about():
-    #Gets constants from constants.py
-    currSportsNames= []
-    for key,value in ACTIVE_SPORTS:  #gets the real names like NBA from the dictionary
-        currSportsNames.append(value)
-        
+ 
     return render_template("about.html", 
                          curr_model=CURRENT_MODEL, 
-                         curr_sports=currSportsNames, 
+                         curr_sports=ACTIVE_SPORTS.values(), 
                          curr_markets=MARKET_NAMES)
 
 if __name__ == '__main__':
