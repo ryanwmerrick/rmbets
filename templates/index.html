@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Sports Bettor</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/home.css') }}">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+      <div class="container">
+        <a class="navbar-brand" href="/">AI Sports Bets</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto"> 
+            <li class="nav-item">
+                <a class="nav-link active" href="/">Daily Picks</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/stats">Track Record</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/about">About</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col text-center">
+            <h1 class="display-4">Today's AI-Powered Sports Bets ({{ curr_Date }})</h1>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="container">
+      <div class="row">
+        
+        {% if not picks %}
+        <div class="col-12 text-center mt-5">
+          <h3 class="text-muted">No picks yet...</h3>
+          <p>Run <code>python3 ingest.py</code> to generate today's bets.</p>
+        </div>
+        {% endif %}
+
+        {% for pick in picks %}
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div class="card bet-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>{{ pick.sport|replace('basketball_', '')|replace('americanfootball_', '')|replace('icehockey_', '')|upper }}</span>
+              <small class="text-muted">{{ pick.game_time | est_time }}</small>
+            </div>
+            
+            <div class="card-body">
+              <h5 class="card-title mb-1">{{ pick.selection }}</h5>
+              <p class="text-muted small mb-3">{{ pick.matchup }}</p>
+
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="odds-box">{{ pick.price }}</span>
+                
+                {% if pick.confidence_score == 'High' %}
+                  <span class="badge bg-success">HIGH CONFIDENCE</span>
+                {% elif pick.confidence_score == 'Medium' %}
+                  <span class="badge bg-warning text-dark">MEDIUM CONFIDENCE</span>
+                {% else %}
+                  <span class="badge bg-secondary">LOW CONFIDENCE</span>
+                {% endif %}
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-12"> 
+                  <div class="border rounded p-2 text-center bg-light">
+                    <small class="d-block text-muted text-uppercase" style="font-size: 0.7rem;">Estimated Edge</small>
+                    <span class="edge-text text-success fw-bold" style="font-size: 1.2rem;">
+                        +{{ (pick.value_edge * 100)|round(1) }}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rationale-box">
+                {{ pick.rationale }}
+              </div>
+            </div>
+            
+            <div class="card-footer bg-white border-top-0">
+              <small class="text-muted market-badge">{{ pick.market_type }}</small>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

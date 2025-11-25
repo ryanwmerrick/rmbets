@@ -1,0 +1,41 @@
+body { 
+    background-color: #f4f6f9; 
+}
+.bet-card {
+    border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; 
+}
+.bet-card:hover { 
+    transform: translateY(-3px); 
+}
+.card-header { 
+    background: white; 
+    border-bottom: 1px solid #eee; 
+    border-radius: 12px 12px 0 0 !important; 
+    font-weight: 700; 
+    color: #444; 
+}
+.market-badge { 
+    font-size: 0.8rem; 
+    text-transform: uppercase; 
+    letter-spacing: 1px; 
+}
+.odds-box { 
+    background: #eef2f7; 
+    color: #2d3748; 
+    padding: 5px 12px; 
+    border-radius: 6px; 
+    font-weight: bold; 
+    font-family: monospace; 
+}
+.edge-text { 
+    font-size: 0.9rem; 
+    font-weight: 600; 
+}
+.rationale-box { 
+    background: #fffbe6; 
+    border-left: 4px solid #ffe58f; 
+    padding: 10px; 
+    font-size: 0.9rem; 
+    color: #666; 
+    margin-top: 10px; 
+}

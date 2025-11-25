@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Track Record - AI Sports Bets</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/stats.css') }}">
+    
+    <style>
+        /* Specific tweak for the model badges to keep table compact */
+        .badge-meta { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.5px; }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+      <div class="container">
+        <a class="navbar-brand" href="/">AI Sports Bets</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto"> 
+            <li class="nav-item">
+                <a class="nav-link" href="/">Daily Picks</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/stats">Track Record</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/about">About</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col text-center">
+            <h1 class="display-6 fw-bold">Performance History</h1>
+            <p class="text-muted">History of all AI recommendations since November 24, 2025.</p>
+            </div>
+        </div>
+        
+        <div class="row mb-5 justify-content-center">
+            <div class="col-md-3 text-center mb-3">
+                <h1 class="display-4 fw-bold" id="winRate">{{ win_rate }}%</h1>
+                <p class="text-muted text-uppercase small ls-1">Win Rate</p>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <h1 class="display-4 fw-bold" id="lossRate">{{ loss_rate }}%</h1>
+                <p class="text-muted text-uppercase small ls-1">Loss Rate</p>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <h1 class="display-4 fw-bold {{ 'text-success' if profit >= 0 else 'text-danger' }}">
+                    ${{ profit }}
+                </h1>
+                <p class="text-muted text-uppercase small ls-1">Profit ($10/Bet)</p>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-12">
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Sport</th>
+                                <th>Matchup</th>
+                                <th>Selection</th>
+                                <th>Odds</th>
+                                <th>Edge</th>
+                                <th>AI Model</th> 
+                                <th>Version</th>   
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if not picks %}
+                            <tr>
+                                <td colspan="9" class="text-center py-5 text-muted">
+                                    No completed games yet. <br>
+                                    <small>Check back after games finish!</small>
+                                </td>
+                            </tr>
+                            {% endif %}
+
+                            {% for pick in picks %}
+                            <tr>
+                                <td class="text-muted small">{{ pick.date.strftime('%Y-%m-%d') }}</td>
+                                
+                                <td>
+                                    <span class="sport-icon">
+                                        {{ pick.sport|replace('basketball_', '')|replace('americanfootball_', '')|replace('icehockey_', '') }}
+                                    </span>
+                                </td>
+                                
+                                <td class="small">{{ pick.matchup }}</td>
+                                
+                                <td class="fw-bold text-primary">{{ pick.selection }}</td>
+                                
+                                <td class="font-monospace">{{ pick.price }}</td>
+                                
+                                <td>
+                                    {% if pick.value_edge %}
+                                        <span class="text-success fw-bold">+{{ (pick.value_edge * 100)|round(1) }}%</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    <span class="badge bg-light text-dark border badge-meta">
+                                        {{ pick.model }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary badge-meta">
+                                        {{ pick.version }}
+                                    </span>
+                                </td>
+                                
+                                <td>
+                                    {% if pick.result == 'WIN' %}
+                                        <span class="badge badge-win">WIN</span>
+                                    {% elif pick.result == 'LOSS' %}
+                                        <span class="badge badge-loss">LOSS</span>
+                                    {% else %}
+                                        <span class="badge badge-pending">PENDING</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
