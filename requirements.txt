@@ -6,3 +6,4 @@ python-dotenv
 apscheduler
 psycopg2-binary #neon db
 pytz #for conversion to EST
+gunicorn
