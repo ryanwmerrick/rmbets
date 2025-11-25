@@ -256,7 +256,7 @@ def run_ingest():
                                 "game_time": formatted_game['game_time'],
                                 "market_type": bet['bet_type'],
                                 "selection": bet['selection'],
-                                "price": bet['odds'],
+                                "odds": bet['odds'],
                                 "confidence_score": bet['confidence_score'],
                                 "value_edge": bet['value_edge'],
                                 "rationale": bet['rationale']
@@ -286,7 +286,7 @@ def run_ingest():
                 game_time=bet['game_time'], #type: ignore
                 market_type=bet['market_type'], #type: ignore
                 selection=bet['selection'], #type: ignore
-                price=bet['price'], #type: ignore
+                odds=bet['odds'], #type: ignore
                 confidence_score=bet['confidence_score'], #type: ignore
                 value_edge=bet['value_edge'], #type: ignore
                 model= CURRENT_MODEL, #type: ignore

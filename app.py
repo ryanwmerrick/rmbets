@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo # Built-in Python library (No install needed)
 
-from constants import CURRENT_MODEL, ACTIVE_SPORTS_NAMES, MARKET_NAMES
+from constants import CURRENT_MODEL, ACTIVE_SPORTS, MARKET_NAMES
 # Load the secrets BEFORE creating the app
 load_dotenv()
 
@@ -54,7 +54,7 @@ def calculate_profit(picks):
             balance -= bet_amount
         elif p.result == 'WIN':
             try:
-                odds = float(p.price)
+                odds = float(p.odds)
                 if odds > 0:
                     profit = bet_amount * (odds / 100)
                 else:
@@ -100,10 +100,14 @@ def stats():
 
 @app.route('/about')
 def about():
-    # Pulling constants from ingest.py
+    #Gets constants from constants.py
+    currSportsNames= []
+    for key,value in ACTIVE_SPORTS:  #gets the real names like NBA from the dictionary
+        currSportsNames.append(value)
+        
     return render_template("about.html", 
                          curr_model=CURRENT_MODEL, 
-                         curr_sports=ACTIVE_SPORTS_NAMES, 
+                         curr_sports=currSportsNames, 
                          curr_markets=MARKET_NAMES)
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ class Pick(db.Model):
     # The Bet
     market_type = db.Column(db.String(50))
     selection = db.Column(db.String(50))
-    price = db.Column(db.String(20))  
+    odds = db.Column(db.String(20))  
     
     # Analysis
     confidence_score = db.Column(db.String(20))
