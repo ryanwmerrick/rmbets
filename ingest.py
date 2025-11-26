@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from app import app
 from models import db, Pick
 
-from constants import CURRENT_MODEL, CURRENT_VERSION, ACTIVE_SPORTS, REGIONS, MARKETS
+from constants import RESEARCH_MODEL, DECISION_MODEL, CURRENT_VERSION, ACTIVE_SPORTS, SPORT_DAYS, REGIONS, MARKETS
 load_dotenv()
 
 # CONFIGURATION
@@ -158,13 +158,11 @@ def run_game_analysis(game_obj):
     FOCUS: Injuries, Schedule (Rest), Motivation, Head-to-Head history.
     """
     res_a = client.models.generate_content(
-        model=CURRENT_MODEL,
+        model=RESEARCH_MODEL,
         contents=prompt_a,
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QualitativeAnalysis)
     )
     qual_data = json.loads(res_a.text) 
-    
-    # SLEEP 5 SECONDS
     time.sleep(5)
 
     # AGENT B: Math
@@ -178,13 +176,11 @@ def run_game_analysis(game_obj):
     2. Total points scored? (Projected Total)
     """
     res_b = client.models.generate_content(
-        model=CURRENT_MODEL,
+        model=RESEARCH_MODEL,
         contents=prompt_b,
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QuantitativeAnalysis)
     )
     quant_data = json.loads(res_b.text) 
-
-    # SLEEP 5 SECONDS
     time.sleep(5)
 
     # AGENT C: The Sharp
@@ -212,7 +208,7 @@ def run_game_analysis(game_obj):
     """
     
     res_c = client.models.generate_content(
-        model=CURRENT_MODEL,
+        model=DECISION_MODEL,
         contents=prompt_c,
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=GameAnalysis)
     )
@@ -222,75 +218,89 @@ def run_game_analysis(game_obj):
 # 4. MAIN RUNNER
 # ==========================================
 
+
 def run_ingest():
     print("--- Starting Analysis Pipeline ---")
     
-    # All potential bets found
+    today_dow = datetime.today().weekday()
+    day_name = datetime.today().strftime('%A')
+    print(f"Today is {day_name} (Day {today_dow})")
+
     all_potential_bets = []
     
-    with app.app_context():
-        db.create_all()
+    # --- STEP 1: DO ALL THE HEAVY LIFTING (NO DB CONNECTION YET) ---
+    # We do NOT use 'with app.app_context()' here.
+    # We just run the python logic.
+    
+    for sport_key in ACTIVE_SPORTS:
+        # Credit Saving Check
+        allowed_days = SPORT_DAYS.get(sport_key)
+        if allowed_days and today_dow not in allowed_days:
+            print(f"[SKIP] {ACTIVE_SPORTS[sport_key]} does not play on {day_name}s.")
+            continue
+
+        raw_games = get_game_odds(sport_key)
         
-        for sport in ACTIVE_SPORTS:
-            raw_games = get_game_odds(sport)
+        if not raw_games:
+            print(f"No games found for {sport_key}.")
+            continue
+
+        print(f"Found {len(raw_games)} games for {sport_key}. Analyzing all...")
+
+        for game in raw_games:
+            formatted_game = format_game_data(game)
+            if not formatted_game: continue
             
-            if not raw_games:
-                print(f"No games found for {sport}.")
-                continue
-
-            print(f"Found {len(raw_games)} games for {sport}. Analyzing all...")
-
-            for game in raw_games:
-                formatted_game = format_game_data(game)
-                if not formatted_game: continue
+            try:
+                decision = run_game_analysis(formatted_game)
                 
-                try:
-                    # Run the Pipeline
-                    decision = run_game_analysis(formatted_game)
-                    
-                    # Logic Check: Did we find any bets?
-                    if decision.get('bets'):
-                   
-                        for bet in decision['bets']:
-                            # We create a temporary dictionary object
-                            # We MUST attach the sport and matchup info now, 
-                            # because the 'bet' object doesn't have it.
-                            bet_record = {
-                                "sport": formatted_game['sport'],
-                                "matchup": formatted_game['matchup'],
-                                "game_time": formatted_game['game_time'],
-                                "market_type": bet['bet_type'],
-                                "selection": bet['selection'],
-                                "odds": bet['odds'],
-                                "confidence_score": bet['confidence_score'],
-                                "value_edge": bet['value_edge'],
-                                "rationale": bet['rationale']
-                            }
-                            all_potential_bets.append(bet_record)
-                            print(f"  -> Found potential bet: {bet['selection']} (Edge: {bet['value_edge']:.2%})")
-                    else:
-                        print(f"  -> [PASS] No value found.")
-                    time.sleep(2)
-                    
-                except Exception as e:
-                    print(f"[ERROR] {e}")
+                if decision.get('bets'):
+                    for bet in decision['bets']:
+                        bet_record = {
+                            "sport": formatted_game['sport'],
+                            "matchup": formatted_game['matchup'],
+                            "game_time": formatted_game['game_time'],
+                            "market_type": bet['bet_type'],
+                            "selection": bet['selection'],
+                            "odds": bet['odds'],
+                            "confidence_score": bet['confidence_score'],
+                            "value_edge": bet['value_edge'],
+                            "rationale": bet['rationale']
+                        }
+                        all_potential_bets.append(bet_record)
+                        print(f"  -> Found potential bet: {bet['selection']} (Edge: {bet['value_edge']:.2%})")
+                else:
+                    print(f"  -> [PASS] No value found.")
+    
+                print("  [Waiting 35s for Pro Model Rate Limit...]")
+                time.sleep(40)
                 
-        # SORTING THE RESULTS
-        print(f"\n--- Analysis Complete. Found {len(all_potential_bets)} total opportunities. ---")
-        print("--- Filtering for Top 9 Best Bets ---")
-        
-       # Filter: Create a new list containing only 'Medium' or 'High' confidence scores.
-        high_confidence_bets = [
-                bet for bet in all_potential_bets 
-                if bet.get('confidence_score') in ['Medium', 'High']
-        ]
-        # Sort: Now sort the filtered list by 'value_edge'.
-        sorted_bets = sorted(
-            high_confidence_bets, 
-            key=lambda x: x.get('value_edge', 0), 
-            reverse=True
-        )
-        top_9_bets = sorted_bets[:9]
+            except Exception as e:
+                print(f"[ERROR] {e}")
+                time.sleep(60)
+            
+    # --- STEP 2: FILTER RESULTS ---
+    print(f"\n--- Analysis Complete. Found {len(all_potential_bets)} total opportunities. ---")
+    print("--- Filtering for Top 9 Best Bets ---")
+    
+    high_confidence_bets = [
+            bet for bet in all_potential_bets 
+            if bet.get('confidence_score') in ['Medium', 'High']
+    ]
+    
+    sorted_bets = sorted(
+        high_confidence_bets, 
+        key=lambda x: x.get('value_edge', 0), 
+        reverse=True
+    )
+    top_9_bets = sorted_bets[:9]
+    
+    # --- STEP 3: OPEN DB CONNECTION AND SAVE QUICKLY ---
+    # We only open the connection NOW, when we are ready to write.
+    print("--- Saving to Database ---")
+    
+    with app.app_context():
+        db.create_all() # Ensure tables exist
         
         for bet in top_9_bets:
             new_pick = Pick(
@@ -302,7 +312,7 @@ def run_ingest():
                 odds=bet['odds'], #type: ignore
                 confidence_score=bet['confidence_score'], #type: ignore
                 value_edge=bet['value_edge'], #type: ignore
-                model= CURRENT_MODEL, #type: ignore
+                model= DECISION_MODEL, #type: ignore
                 version= CURRENT_VERSION, #type: ignore
                 rationale=bet['rationale'] #type: ignore
             )
@@ -310,6 +320,7 @@ def run_ingest():
             db.session.add(new_pick)
             print(f"[SAVED TO DB] {bet['selection']} (Edge: {bet['value_edge']:.2%})")
 
+        # This commit happens immediately after opening, so no timeout!
         db.session.commit()
         
     print("--- DONE ---\n")

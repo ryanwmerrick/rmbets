@@ -11,15 +11,8 @@ load_dotenv()
 ODDS_API_KEY = os.getenv("ODDS_API_KEY")
 DAYS_LOOKBACK = 3
 
-# --- NEW: Translation Dictionary ---
-# Maps your Database names to the API Keys
-SPORT_MAPPING = {
-    'NBA': 'basketball_nba',
-    'NFL': 'americanfootball_nfl',
-    'NHL': 'icehockey_nhl',
-    'MLB': 'baseball_mlb',
-    # Add others here if needed
-}
+# We create the reverse mapping locally for efficiency: {'NBA': 'basketball_nba', ...}
+DB_TO_API_KEY = {v: k for k, v in ACTIVE_SPORTS.items()}
 
 def get_scores(sport_key):
     print(f"  Fetching scores for {sport_key}...")
@@ -164,34 +157,34 @@ def run_grader():
             print("No pending picks to grade.")
             return
 
-
-        # 1. CREATE REVERSE MAPPING (DB Name -> API Key)
-        db_to_api = {v: k for k, v in ACTIVE_SPORTS.items()}
-        
-        # 2. IDENTIFY NEEDED API KEYS
+        # 1. IDENTIFY NEEDED API KEYS based on current PENDING bets
         needed_api_keys = set()
         for pick in pending_picks:
-            api_key = db_to_api.get(pick.sport)
+            # Look up the API key using the friendly name from the DB (e.g., 'UCL')
+            api_key = DB_TO_API_KEY.get(pick.sport) 
             if api_key:
                 needed_api_keys.add(api_key)
             else:
-                print(f"  [WARNING] Unknown sport in DB: '{pick.sport}'. Check constants.py.")
+                print(f"  [WARNING] Unknown sport in DB: '{pick.sport}'.")
 
         print(f"Fetching data for: {needed_api_keys}")
         
+        # 2. FETCH SCORES
         scores_cache = {}
         for sport_key in needed_api_keys:
             scores_cache[sport_key] = get_scores(sport_key)
 
-        for pick in pending_picks:
+        print(f"Grading {len(pending_picks)} picks...")
 
-            api_sport_key = SPORT_MAPPING.get(pick.sport, pick.sport)
-            scores = scores_cache.get(api_sport_key)
+        # 3. GRADE EACH PICK
+        for pick in pending_picks:
+            # Convert the friendly name back to the API key for the cache lookup
+            api_sport_key = DB_TO_API_KEY.get(pick.sport)
+            if not api_sport_key or api_sport_key not in scores_cache: 
+                 # This happens if API returned no data for that sport key
+                 continue
             
-            if not scores: 
-                print(f"  [SKIP] Pick: {pick.selection} (Sport: {pick.sport} -> {api_sport_key})")
-                print(f"         Reason: No scores found in cache.")
-                continue
+            scores = scores_cache.get(api_sport_key)
             
             game_result = find_game_result(pick, scores)
             
@@ -203,10 +196,12 @@ def run_grader():
                     db.session.add(pick) 
                     print(f"  [GRADED] {pick.selection}: {outcome} (Score: {game_result['away_score']}-{game_result['home_score']})")
                 else:
-                    print(f"  [SKIP/PUSH] {pick.selection}: {outcome or 'Game in progress/No grade'}")
+                    print(f"  [SKIP/PUSH] {pick.selection}: {outcome or 'Game not complete'}")
             else:
+                # This FAIL means the game result wasn't found in the API's completed list (still pending)
                 print(f"  [FAIL] Could not match: '{pick.matchup}' in API data.")
             
+        # 4. Save all changes to DB
         db.session.commit()
     
     print("--- DONE ---")

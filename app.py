@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo # Built-in Python library (No install needed)
 
-from constants import CURRENT_MODEL, ACTIVE_SPORTS, MARKET_NAMES
+from constants import RESEARCH_MODEL, DECISION_MODEL, ACTIVE_SPORTS, MARKET_NAMES
 # Load the secrets BEFORE creating the app
 load_dotenv()
 
@@ -102,7 +102,8 @@ def stats():
 def about():
  
     return render_template("about.html", 
-                         curr_model=CURRENT_MODEL, 
+                         curr_decision_model= DECISION_MODEL, 
+                         curr_research_model= RESEARCH_MODEL,
                          curr_sports=ACTIVE_SPORTS.values(), 
                          curr_markets=MARKET_NAMES)
 
