@@ -163,7 +163,7 @@ def run_game_analysis(game_obj):
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QualitativeAnalysis)
     )
     qual_data = json.loads(res_a.text) 
-    time.sleep(5)
+    time.sleep(2)
 
     # AGENT B: Math
     prompt_b = f"""
@@ -181,7 +181,7 @@ def run_game_analysis(game_obj):
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QuantitativeAnalysis)
     )
     quant_data = json.loads(res_b.text) 
-    time.sleep(5)
+    time.sleep(2)
 
     # AGENT C: The Sharp
     final_context = f"""
@@ -272,8 +272,8 @@ def run_ingest():
                 else:
                     print(f"  -> [PASS] No value found.")
     
-                print("  [Waiting 35s for Pro Model Rate Limit...]")
-                time.sleep(40)
+                print("  [Waiting 30 for Pro Model Rate Limit...]")
+                time.sleep(30)
                 
             except Exception as e:
                 print(f"[ERROR] {e}")
