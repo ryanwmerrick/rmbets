@@ -7,7 +7,7 @@ RESEARCH_MODEL = "gemini-2.0-flash"
 DECISION_MODEL = "gemini-2.5-pro"
 
 # High reasoning, very low rate limit (2 RPM)
-CURRENT_VERSION = "v1.1"
+CURRENT_VERSION = "v1.2"
 
 
 #REMEMBER:

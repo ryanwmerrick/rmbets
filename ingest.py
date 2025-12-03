@@ -50,6 +50,8 @@ class RecommendedBet(BaseModel):
 class GameAnalysis(BaseModel):
     matchup: str
     bets: List[RecommendedBet]
+    reason_for_pass: Optional[str] = None 
+
 
 # ==========================================
 # 2. HELPER FUNCTIONS
@@ -153,32 +155,65 @@ def run_game_analysis(game_obj):
 
     # AGENT A: Context
     prompt_a = f"""
-    ROLE: Expert Sports Journalist.
-    TASK: Identify the top 3 critical factors for: {matchup} ({game_obj['sport']}).
-    FOCUS: Injuries, Schedule (Rest), Motivation, Head-to-Head history.
+    ROLE: Expert Sports Journalist & Insider.
+    TASK: Analyze qualitative factors for: {matchup} ({game_obj['sport']}).
+    
+    CRITICAL: Identify "Model Breakers" - events so significant that historical stats (last 5 games) become irrelevant (e.g., Starting QB out, team played double OT last night).
+    
+    FACTORS:
+    1. Injuries (Key starters only)
+    2. Schedule/Rest (Travel fatigue, back-to-backs)
+    3. Motivation (Revenge game, must-win, tanking)
+    4. Public Sentiment (Is the line moving on hype?)
+
+    OUTPUT SCHEMA (JSON):
+    - impact_factors (list of strings)
+    - model_breakers (boolean): True if major lineup/rest changes make historical data unreliable.
+    - team_a_motivation (1-10 scale)
+    - team_b_motivation (1-10 scale)
     """
+    
     res_a = client.models.generate_content(
         model=RESEARCH_MODEL,
         contents=prompt_a,
-        config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QualitativeAnalysis)
+        config=types.GenerateContentConfig(
+            response_mime_type='application/json', 
+            response_schema=QualitativeAnalysis
+        )
     )
     qual_data = json.loads(res_a.text) 
     time.sleep(2)
 
     # AGENT B: Math
     prompt_b = f"""
-    ROLE: Quantitative Sports Modeler.
-    TASK: Create a fair-value projection for: {matchup}.
-    lines: {lines}
+    ROLE: Conservative Quantitative Modeler.
+    TASK: Create a probabilistic scoring projection for: {matchup}.
+    MARKET LINES: {lines}
     
-    OUTPUT:
-    1. Who wins and by how much? (Projected Spread)
-    2. Total points scored? (Projected Total)
+    METHODOLOGY:
+    1. Base calculation on Season Averages.
+    2. Apply weighted adjustment for Last 5 Games (2x weight).
+    3. PENALIZE variance: If a team is inconsistent, widen the range.
+    
+    OUTPUT REQUIREMENTS:
+    - Do NOT output a single score. Output a Median, Floor (10th percentile), and Ceiling (90th percentile).
+    - If key players are missing (implied by lines), lower the ceiling significantly.
+    
+    OUTPUT SCHEMA (JSON):
+    - projected_winner (str)
+    - home_score_range {{ "floor": int, "median": int, "ceiling": int }}
+    - away_score_range {{ "floor": int, "median": int, "ceiling": int }}
+    - projected_total_median (int)
+    - implied_spread (int): (Home Median - Away Median)
     """
+
     res_b = client.models.generate_content(
         model=RESEARCH_MODEL,
         contents=prompt_b,
-        config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QuantitativeAnalysis)
+        config=types.GenerateContentConfig(
+            response_mime_type='application/json', 
+            response_schema=QuantitativeAnalysis
+        )
     )
     quant_data = json.loads(res_b.text) 
     time.sleep(2)
@@ -188,31 +223,61 @@ def run_game_analysis(game_obj):
     MATCHUP: {matchup}
     MARKET LINES: {lines}
     
-    QUALITATIVE: {json.dumps(qual_data['impact_factors'])}
-    QUANTITATIVE: {quant_data['projected_winner']} by {quant_data['projected_spread']} pts. Total: {quant_data['projected_total']}.
+    REPORT A (Qualitative):
+    - Model Breakers Present: {qual_data.get('model_breakers')}
+    - Factors: {json.dumps(qual_data.get('impact_factors'))}
+    - Motivation Gap: {abs(qual_data.get('team_a_motivation', 5) - qual_data.get('team_b_motivation', 5))}
+    
+    REPORT B (Quantitative):
+    - Project Spread: {quant_data.get('implied_spread')}
+    - Home Range: {quant_data.get('home_score_range')}
+    - Away Range: {quant_data.get('away_score_range')}
     """
     
     prompt_c = f"""
-    ROLE: Lead Handicapper.
+    ROLE: Lead Handicapper & Risk Manager.
     CONTEXT: {final_context}
     
-    TASK: Identify ALL bets for this game that have positive expected value (+EV).
+    PHILOSOPHY:
+    - The market is efficient. Finding a real edge is rare.
+    - YOUR DEFAULT ACTION IS TO PASS (NO BET).
+    - It is better to miss a winning bet than to make a losing one.
+    - Expect to return an empty list of bets for 80% of games analyzed.
+
+    TASK: Synthesize reports to identify ONLY high-confidence +EV bets.
     
-    CRITERIA:
-    - Compare Market Lines vs Quantitative Projections.
-    - Factor in Qualitative risks.
-    - Minimum Edge: 3%. If no bets meet this, return an empty list.
-    - IMPORTANT: Be conservative with 'value_edge'. 0.05 is a 5% edge. 0.50 is 50%.
-    - Output 'odds' in American format (e.g. "-110").
-    - Return a JSON object containing a list of 'bets'.
+    STRICT FILTERING RULES (The "No Action" Protocol):
+    1. THE "NO ACTION" ZONE: 
+       - If the Market Spread is within 2.5 points of the Projected Spread -> PASS.
+       - If the Market Total is within 4.0 points of the Projected Total -> PASS.
+       - Example: Market Total 220. Projected 223. Diff is 3. PASS.
+    
+    2. CONSENSUS REQUIRED: 
+       - If Agent A (Qualitative) is negative/worried about a team, do NOT bet on them even if Agent B (Math) likes them.
+       - Disagreement between Quant and Qual = Automatic PASS.
+    
+    3. RANGE CHECK: 
+       - Only bet if the Market Line falls OUTSIDE Agent B's projected Floor/Ceiling range. 
+       - If the Market Line is inside the range [Floor, Ceiling], it implies the outcome is within standard variance -> PASS.
+
+    4. HALLUCINATION CHECK: 
+       - If the calculated edge is > 15% (e.g. implied odds -200 vs market -110), assume Agent B is hallucinating and REJECT the bet.
+    
+    OUTPUT:
+    Return a JSON object with a list of 'bets'. 
+    If NO bet meets ALL strict criteria, return: {{ "bets": [], "reason_for_pass": "Explanation..." }}
     """
     
     res_c = client.models.generate_content(
         model=DECISION_MODEL,
         contents=prompt_c,
-        config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=GameAnalysis)
+        config=types.GenerateContentConfig(
+            response_mime_type='application/json', 
+            response_schema=GameAnalysis
+        )
     )
-    return json.loads(res_c.text) #type:ignore
+    
+    return json.loads(res_c.text) #type: ignore
 
 # ==========================================
 # 4. MAIN RUNNER
