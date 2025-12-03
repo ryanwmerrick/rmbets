@@ -38,7 +38,6 @@ def format_est(value, format="%b %d @ %I:%M %p"):
     
     # Convert to EST
     local_dt = value.astimezone(est)
-    local_dt = local_dt - timedelta(minutes=10) #adjusts back 10 min for national anthem
     return local_dt.strftime(format)
 
 # Register the filter so Jinja can use it
@@ -69,7 +68,10 @@ def index():
     # Fetch all PENDING picks for the homepage
     picks = Pick.query.filter_by(result="PENDING").order_by(Pick.date.asc()).all()
     # Get today's date for display
-    today_str = date.today().strftime("%m/%d/%y")
+    if picks:
+        today_str = picks[0].date.strftime("%m/%d/%Y")
+    else:
+        today_str= "..."
     return render_template('index.html', picks=picks, curr_Date=today_str)
 
 @app.route('/stats')
