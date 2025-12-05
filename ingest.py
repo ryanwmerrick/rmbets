@@ -29,12 +29,19 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 class QualitativeAnalysis(BaseModel):
     matchup: str
     impact_factors: List[str] 
+    model_breakers: bool
+    team_a_motivation: int = Field(ge=1, le=10)
+    team_b_motivation: int = Field(ge=1, le=10)
 
 class QuantitativeAnalysis(BaseModel):
     matchup: str
     projected_winner: str
     projected_spread: float
     projected_total: float
+    confidence_score: int
+    home_score_range: dict 
+    away_score_range: dict
+    implied_spread: float 
     confidence_score: int
 
 class RecommendedBet(BaseModel):
@@ -186,7 +193,7 @@ def run_game_analysis(game_obj):
 
     # AGENT B: Math
     prompt_b = f"""
-    ROLE: Conservative Quantitative Modeler.
+    ROLE: Professional Sports Better (Quantitative).
     TASK: Create a probabilistic scoring projection for: {matchup}.
     MARKET LINES: {lines}
     
@@ -194,17 +201,22 @@ def run_game_analysis(game_obj):
     1. Base calculation on Season Averages.
     2. Apply weighted adjustment for Last 5 Games (2x weight).
     3. PENALIZE variance: If a team is inconsistent, widen the range.
+    4. If a Key Player is OUT (check lines), adjust manually.
     
     OUTPUT REQUIREMENTS:
-    - Do NOT output a single score. Output a Median, Floor (10th percentile), and Ceiling (90th percentile).
-    - If key players are missing (implied by lines), lower the ceiling significantly.
+    - Provide a "Median" projection (your true predicted score).
+    - Provide a "Floor" and "Ceiling" (10th/90th percentile outcomes).
+    - implied_spread = (Home Median - Away Median).
     
     OUTPUT SCHEMA (JSON):
     - projected_winner (str)
     - home_score_range {{ "floor": int, "median": int, "ceiling": int }}
     - away_score_range {{ "floor": int, "median": int, "ceiling": int }}
     - projected_total_median (int)
-    - implied_spread (int): (Home Median - Away Median)
+    - implied_spread (float)
+    - projected_spread (float)
+    - projected_total (float)
+    - confidence_score (int 1-10)
     """
 
     res_b = client.models.generate_content(
@@ -229,7 +241,8 @@ def run_game_analysis(game_obj):
     - Motivation Gap: {abs(qual_data.get('team_a_motivation', 5) - qual_data.get('team_b_motivation', 5))}
     
     REPORT B (Quantitative):
-    - Project Spread: {quant_data.get('implied_spread')}
+    - Projected Spread: {quant_data.get('implied_spread')}
+    - Projected Total: {quant_data.get('projected_total')}
     - Home Range: {quant_data.get('home_score_range')}
     - Away Range: {quant_data.get('away_score_range')}
     """
@@ -238,34 +251,28 @@ def run_game_analysis(game_obj):
     ROLE: Lead Handicapper & Risk Manager.
     CONTEXT: {final_context}
     
-    PHILOSOPHY:
-    - The market is efficient. Finding a real edge is rare.
-    - YOUR DEFAULT ACTION IS TO PASS (NO BET).
-    - It is better to miss a winning bet than to make a losing one.
-    - Expect to return an empty list of bets for 80% of games analyzed.
+    TASK: Identify positive expected value (+EV) bets.
+    
+    EVALUATION CRITERIA:
+    1. MINIMUM EDGE (The "Actionable" Zone):
+       - Spread: Market must differ by >= 1.5 points from Projection.
+       - Total: Market must differ by >= 2.5 points from Projection.
+       - If edge is smaller than this, PASS.
+    
+    2. CONSENSUS:
+       - If Agent A (Qual) and Agent B (Quant) disagree on direction, PASS.
+       - If Agent A flags "Model Breakers", Increase Minimum Edge requirements by 50%.
 
-    TASK: Synthesize reports to identify ONLY high-confidence +EV bets.
+    3. CONFIDENCE SCORING:
+       - High Confidence: Edge > 3.0 pts AND Line is outside Agent B's Floor/Ceiling.
+       - Medium Confidence: Edge > 2.0 pts.
+       - Low Confidence: Edge > 1.5 pts (A "Lean").
     
-    STRICT FILTERING RULES (The "No Action" Protocol):
-    1. THE "NO ACTION" ZONE: 
-       - If the Market Spread is within 2.5 points of the Projected Spread -> PASS.
-       - If the Market Total is within 4.0 points of the Projected Total -> PASS.
-       - Example: Market Total 220. Projected 223. Diff is 3. PASS.
-    
-    2. CONSENSUS REQUIRED: 
-       - If Agent A (Qualitative) is negative/worried about a team, do NOT bet on them even if Agent B (Math) likes them.
-       - Disagreement between Quant and Qual = Automatic PASS.
-    
-    3. RANGE CHECK: 
-       - Only bet if the Market Line falls OUTSIDE Agent B's projected Floor/Ceiling range. 
-       - If the Market Line is inside the range [Floor, Ceiling], it implies the outcome is within standard variance -> PASS.
-
-    4. HALLUCINATION CHECK: 
-       - If the calculated edge is > 15% (e.g. implied odds -200 vs market -110), assume Agent B is hallucinating and REJECT the bet.
+    4. SANITY CHECK:
+       - If calculated edge > 25% (huge outlier), assume hallucination and PASS.
     
     OUTPUT:
-    Return a JSON object with a list of 'bets'. 
-    If NO bet meets ALL strict criteria, return: {{ "bets": [], "reason_for_pass": "Explanation..." }}
+    Return a list of 'bets'. If no bets meet criteria, return empty list.
     """
     
     res_c = client.models.generate_content(
