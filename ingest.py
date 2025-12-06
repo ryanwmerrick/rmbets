@@ -26,23 +26,30 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 # 1. NEW PYDANTIC SCHEMAS (LIST SUPPORT)
 # ==========================================
 
+class ScoreRange(BaseModel):
+    floor: int
+    median: int
+    ceiling: int
+    model_config = {'extra': 'forbid'}
+    
 class QualitativeAnalysis(BaseModel):
     matchup: str
     impact_factors: List[str] 
     model_breakers: bool
     team_a_motivation: int = Field(ge=1, le=10)
     team_b_motivation: int = Field(ge=1, le=10)
+    model_config = {'extra': 'forbid'}
 
 class QuantitativeAnalysis(BaseModel):
     matchup: str
     projected_winner: str
     projected_spread: float
     projected_total: float
-    confidence_score: int
-    home_score_range: dict 
-    away_score_range: dict
+    home_score_range: ScoreRange 
+    away_score_range: ScoreRange
     implied_spread: float 
     confidence_score: int
+    model_config = {'extra': 'forbid'}
 
 class RecommendedBet(BaseModel):
     bet_type: str      # "Moneyline", "Spread", "Total"
@@ -52,12 +59,14 @@ class RecommendedBet(BaseModel):
     value_edge: float  # e.g., 0.045
     rationale: str
     confidence_score: str # "High", "Medium", "Low"
+    model_config = {'extra': 'forbid'}
 
 # The AI returns this Wrapper, which contains a LIST of bets
 class GameAnalysis(BaseModel):
     matchup: str
     bets: List[RecommendedBet]
     reason_for_pass: Optional[str] = None 
+    model_config = {'extra': 'forbid'}
 
 
 # ==========================================
