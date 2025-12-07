@@ -30,7 +30,6 @@ class ScoreRange(BaseModel):
     floor: int
     median: int
     ceiling: int
-    model_config = {'extra': 'forbid'}
     
 class QualitativeAnalysis(BaseModel):
     matchup: str
@@ -38,7 +37,7 @@ class QualitativeAnalysis(BaseModel):
     model_breakers: bool
     team_a_motivation: int = Field(ge=1, le=10)
     team_b_motivation: int = Field(ge=1, le=10)
-    model_config = {'extra': 'forbid'}
+
 
 class QuantitativeAnalysis(BaseModel):
     matchup: str
@@ -49,7 +48,6 @@ class QuantitativeAnalysis(BaseModel):
     away_score_range: ScoreRange
     implied_spread: float 
     confidence_score: int
-    model_config = {'extra': 'forbid'}
 
 class RecommendedBet(BaseModel):
     bet_type: str      # "Moneyline", "Spread", "Total"
@@ -59,14 +57,12 @@ class RecommendedBet(BaseModel):
     value_edge: float  # e.g., 0.045
     rationale: str
     confidence_score: str # "High", "Medium", "Low"
-    model_config = {'extra': 'forbid'}
 
 # The AI returns this Wrapper, which contains a LIST of bets
 class GameAnalysis(BaseModel):
     matchup: str
     bets: List[RecommendedBet]
     reason_for_pass: Optional[str] = None 
-    model_config = {'extra': 'forbid'}
 
 
 # ==========================================
@@ -171,46 +167,43 @@ def run_game_analysis(game_obj):
 
     # AGENT A: Context
     prompt_a = f"""
-    ROLE: Expert Sports Journalist & Insider.
+    ROLE: Expert Sports Journalist.
     TASK: Analyze qualitative factors for: {matchup} ({game_obj['sport']}).
-    
-    CRITICAL: Identify "Model Breakers" - events so significant that historical stats (last 5 games) become irrelevant (e.g., Starting QB out, team played double OT last night).
     
     FACTORS:
     1. Injuries (Key starters only)
-    2. Schedule/Rest (Travel fatigue, back-to-backs)
-    3. Motivation (Revenge game, must-win, tanking)
-    4. Public Sentiment (Is the line moving on hype?)
+    2. Schedule/Rest 
+    3. Motivation 
+    4. Model Breakers (Is there a reason to ignore stats?)
 
     OUTPUT SCHEMA (JSON):
     - impact_factors (list of strings)
-    - model_breakers (boolean): True if major lineup/rest changes make historical data unreliable.
-    - team_a_motivation (1-10 scale)
-    - team_b_motivation (1-10 scale)
+    - model_breakers (boolean)
+    - team_a_motivation (1-10)
+    - team_b_motivation (1-10)
     """
     
     res_a = client.models.generate_content(
         model=RESEARCH_MODEL,
         contents=prompt_a,
         config=types.GenerateContentConfig(
-            response_mime_type='application/json', 
-            response_schema=QualitativeAnalysis
+            response_mime_type='application/json'
+
         )
     )
     qual_data = json.loads(res_a.text) 
     time.sleep(2)
 
     # AGENT B: Math
+    # ADJUSTMENT: Removed "Conservative" moniker to prevent it from hugging the market line.
     prompt_b = f"""
     ROLE: Professional Sports Better (Quantitative).
-    TASK: Create a probabilistic scoring projection for: {matchup}.
+    TASK: Create a scoring projection for: {matchup}.
     MARKET LINES: {lines}
     
     METHODOLOGY:
-    1. Base calculation on Season Averages.
-    2. Apply weighted adjustment for Last 5 Games (2x weight).
-    3. PENALIZE variance: If a team is inconsistent, widen the range.
-    4. If a Key Player is OUT (check lines), adjust manually.
+    - Weigh Last 5 Games heavy (2x).
+    - If a Key Player is OUT (check lines), adjust manually.
     
     OUTPUT REQUIREMENTS:
     - Provide a "Median" projection (your true predicted score).
@@ -232,8 +225,8 @@ def run_game_analysis(game_obj):
         model=RESEARCH_MODEL,
         contents=prompt_b,
         config=types.GenerateContentConfig(
-            response_mime_type='application/json', 
-            response_schema=QuantitativeAnalysis
+            response_mime_type='application/json'
+        
         )
     )
     quant_data = json.loads(res_b.text) 
@@ -245,19 +238,20 @@ def run_game_analysis(game_obj):
     MARKET LINES: {lines}
     
     REPORT A (Qualitative):
-    - Model Breakers Present: {qual_data.get('model_breakers')}
+    - Breakers: {qual_data.get('model_breakers')}
     - Factors: {json.dumps(qual_data.get('impact_factors'))}
-    - Motivation Gap: {abs(qual_data.get('team_a_motivation', 5) - qual_data.get('team_b_motivation', 5))}
+    - Mot. Gap: {abs(qual_data.get('team_a_motivation', 5) - qual_data.get('team_b_motivation', 5))}
     
     REPORT B (Quantitative):
-    - Projected Spread: {quant_data.get('implied_spread')}
-    - Projected Total: {quant_data.get('projected_total')}
+    - Proj Spread: {quant_data.get('implied_spread')}
+    - Proj Total: {quant_data.get('projected_total')}
     - Home Range: {quant_data.get('home_score_range')}
     - Away Range: {quant_data.get('away_score_range')}
     """
     
+    # ADJUSTMENT: Relaxed thresholds significantly to allow "Lean" bets.
     prompt_c = f"""
-    ROLE: Lead Handicapper & Risk Manager.
+    ROLE: Lead Handicapper.
     CONTEXT: {final_context}
     
     TASK: Identify positive expected value (+EV) bets.
@@ -288,8 +282,8 @@ def run_game_analysis(game_obj):
         model=DECISION_MODEL,
         contents=prompt_c,
         config=types.GenerateContentConfig(
-            response_mime_type='application/json', 
-            response_schema=GameAnalysis
+            response_mime_type='application/json'
+ 
         )
     )
     
@@ -305,28 +299,20 @@ def run_ingest():
     
     today_dow = datetime.today().weekday()
     day_name = datetime.today().strftime('%A')
-    print(f"Today is {day_name} (Day {today_dow})")
+    print(f"Today is {day_name}")
 
     all_potential_bets = []
     
-    # --- STEP 1: DO ALL THE HEAVY LIFTING (NO DB CONNECTION YET) ---
-    # We do NOT use 'with app.app_context()' here.
-    # We just run the python logic.
-    
     for sport_key in ACTIVE_SPORTS:
-        # Credit Saving Check
         allowed_days = SPORT_DAYS.get(sport_key)
         if allowed_days and today_dow not in allowed_days:
-            print(f"[SKIP] {ACTIVE_SPORTS[sport_key]} does not play on {day_name}s.")
+            print(f"[SKIP] {ACTIVE_SPORTS[sport_key]}")
             continue
 
         raw_games = get_game_odds(sport_key)
-        
-        if not raw_games:
-            print(f"No games found for {sport_key}.")
-            continue
+        if not raw_games: continue
 
-        print(f"Found {len(raw_games)} games for {sport_key}. Analyzing all...")
+        print(f"Found {len(raw_games)} games for {sport_key}.")
 
         for game in raw_games:
             formatted_game = format_game_data(game)
@@ -349,61 +335,44 @@ def run_ingest():
                             "rationale": bet['rationale']
                         }
                         all_potential_bets.append(bet_record)
-                        print(f"  -> Found potential bet: {bet['selection']} (Edge: {bet['value_edge']:.2%})")
+                        print(f"  -> BET FOUND: {bet['selection']} ({bet['confidence_score']})")
                 else:
-                    print(f"  -> [PASS] No value found.")
+                    print(f"  -> [PASS] {decision.get('reason_for_pass', 'No edge')}")
     
-                print("  [Waiting 30 for Pro Model Rate Limit...]")
-                time.sleep(30)
+                time.sleep(15) # sleep time for ai model limits
                 
             except Exception as e:
-                print(f"[ERROR] {e}")
-                time.sleep(60)
+                error_str = str(e)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    print(f"[RATE LIMIT HIT] Cooling down for 60s...")
+                    time.sleep(60)
+                else:
+                    print(f"[ERROR] {e}")
+                    time.sleep(5)
             
-    # --- STEP 2: FILTER RESULTS ---
-    print(f"\n--- Analysis Complete. Found {len(all_potential_bets)} total opportunities. ---")
-    print("--- Filtering for Top 9 Best Bets ---")
+    # --- SAVE TO DB ---
+    print(f"\n--- Saving {len(all_potential_bets)} bets ---")
     
-    high_confidence_bets = [
-            bet for bet in all_potential_bets 
-            if bet.get('confidence_score') in ['Medium', 'High']
-    ]
+    if all_potential_bets:
+        with app.app_context():
+            db.create_all()
+            for bet in all_potential_bets:
+                new_pick = Pick(
+                    sport=bet['sport'], #type: ignore
+                    matchup=bet['matchup'], #type: ignore
+                    game_time=bet['game_time'], #type: ignore
+                    market_type=bet['market_type'], #type: ignore
+                    selection=bet['selection'], #type: ignore
+                    odds=bet['odds'], #type: ignore
+                    confidence_score=bet['confidence_score'], #type: ignore
+                    value_edge=bet['value_edge'], #type: ignore
+                    model= DECISION_MODEL, #type: ignore
+                    version= CURRENT_VERSION, #type: ignore
+                    rationale=bet['rationale'] #type: ignore
+                )
+                db.session.add(new_pick)
+            db.session.commit()
     
-    sorted_bets = sorted(
-        high_confidence_bets, 
-        key=lambda x: x.get('value_edge', 0), 
-        reverse=True
-    )
-    top_9_bets = sorted_bets[:9]
-    
-    # --- STEP 3: OPEN DB CONNECTION AND SAVE QUICKLY ---
-    # We only open the connection NOW, when we are ready to write.
-    print("--- Saving to Database ---")
-    
-    with app.app_context():
-        db.create_all() # Ensure tables exist
-        
-        for bet in top_9_bets:
-            new_pick = Pick(
-                sport=bet['sport'], #type: ignore
-                matchup=bet['matchup'], #type: ignore
-                game_time=bet['game_time'], #type: ignore
-                market_type=bet['market_type'], #type: ignore
-                selection=bet['selection'], #type: ignore
-                odds=bet['odds'], #type: ignore
-                confidence_score=bet['confidence_score'], #type: ignore
-                value_edge=bet['value_edge'], #type: ignore
-                model= DECISION_MODEL, #type: ignore
-                version= CURRENT_VERSION, #type: ignore
-                rationale=bet['rationale'] #type: ignore
-            )
-
-            db.session.add(new_pick)
-            print(f"[SAVED TO DB] {bet['selection']} (Edge: {bet['value_edge']:.2%})")
-
-        # This commit happens immediately after opening, so no timeout!
-        db.session.commit()
-        
     print("--- DONE ---\n")
 
 if __name__ == "__main__":

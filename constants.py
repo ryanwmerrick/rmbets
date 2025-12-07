@@ -1,7 +1,7 @@
 # SHARED CONFIGURATION
 
 # Preparing Research (15 RPM)
-RESEARCH_MODEL = "gemini-2.0-flash" 
+RESEARCH_MODEL = "gemini-2.5-flash" 
 
 # The "Boss": High reasoning, very low rate limit (2 RPM)
 DECISION_MODEL = "gemini-2.5-pro"
