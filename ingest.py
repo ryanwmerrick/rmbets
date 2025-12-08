@@ -191,7 +191,11 @@ def run_game_analysis(game_obj):
 
         )
     )
-    qual_data = json.loads(res_a.text) 
+    raw_a = json.loads(res_a.text)
+    while isinstance(raw_a, list):
+        raw_a = raw_a[0] if raw_a else {}
+    qual_data = raw_a
+    
     time.sleep(2)
 
     # AGENT B: Math
@@ -229,7 +233,11 @@ def run_game_analysis(game_obj):
         
         )
     )
-    quant_data = json.loads(res_b.text) 
+    raw_b = json.loads(res_b.text)
+    while isinstance(raw_b, list):
+        raw_b = raw_b[0] if raw_b else {}
+    quant_data = raw_b
+  
     time.sleep(2)
 
     # AGENT C: The Sharp
@@ -258,21 +266,21 @@ def run_game_analysis(game_obj):
     
     EVALUATION CRITERIA:
     1. MINIMUM EDGE (The "Actionable" Zone):
-       - Spread: Market must differ by >= 1.5 points from Projection.
-       - Total: Market must differ by >= 2.5 points from Projection.
+       - Spread: Market must differ by >= 1.0 points from Projection.
+       - Total: Market must differ by >= 1.5 points from Projection.
        - If edge is smaller than this, PASS.
     
     2. CONSENSUS:
-       - If Agent A (Qual) and Agent B (Quant) disagree on direction, PASS.
+       - If Agent A (Qual) and Agent B (Quant) disagree on direction, Low Confidence only.
        - If Agent A flags "Model Breakers", Increase Minimum Edge requirements by 50%.
 
     3. CONFIDENCE SCORING:
-       - High Confidence: Edge > 3.0 pts AND Line is outside Agent B's Floor/Ceiling.
-       - Medium Confidence: Edge > 2.0 pts.
-       - Low Confidence: Edge > 1.5 pts (A "Lean").
+       - High Confidence: Edge > 2.5 pts AND Line is outside Agent B's Floor/Ceiling.
+       - Medium Confidence: Edge > 1.5 pts.
+       - Low Confidence: Edge > 1.0 pts (A "Lean").
     
     4. SANITY CHECK:
-       - If calculated edge > 25% (huge outlier), assume hallucination and PASS.
+       - If calculated edge > 50% (huge outlier), assume hallucination and PASS.
     
     OUTPUT:
     Return a list of 'bets'. If no bets meet criteria, return empty list.
@@ -287,7 +295,13 @@ def run_game_analysis(game_obj):
         )
     )
     
-    return json.loads(res_c.text) #type: ignore
+    raw_c = json.loads(res_c.text)
+    while isinstance(raw_c, list):
+        raw_c = raw_c[0] if raw_c else {}
+    decision = raw_c
+        
+    
+    return decision 
 
 # ==========================================
 # 4. MAIN RUNNER
