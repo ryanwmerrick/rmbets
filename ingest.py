@@ -171,10 +171,13 @@ def run_game_analysis(game_obj):
     TASK: Analyze qualitative factors for: {matchup} ({game_obj['sport']}).
     
     FACTORS:
-    1. Injuries (Key starters only)
-    2. Schedule/Rest 
-    3. Motivation 
-    4. Model Breakers (Is there a reason to ignore stats?)
+    1. Injuries (Tier 1 Stars ONLY). Ignore role players.
+    2. Schedule/Rest.
+    3. Motivation.
+    
+    CRITICAL INSTRUCTION:
+    Only set "model_breakers" to True if a TEAM-ALTERING event has occurred (e.g. LeBron James OUT). 
+    Do not flag standard rotation changes.
 
     OUTPUT SCHEMA (JSON):
     - impact_factors (list of strings)
@@ -199,15 +202,19 @@ def run_game_analysis(game_obj):
     time.sleep(2)
 
     # AGENT B: Math
-    # ADJUSTMENT: Removed "Conservative" moniker to prevent it from hugging the market line.
     prompt_b = f"""
     ROLE: Professional Sports Better (Quantitative).
     TASK: Create a scoring projection for: {matchup}.
     MARKET LINES: {lines}
     
     METHODOLOGY:
-    - Weigh Last 5 Games heavy (2x).
-    - If a Key Player is OUT (check lines), adjust manually.
+    - Base weight on Season Averages.
+    - MULTIPLY weight of Last 5 Games by 3x (Recency Bias).
+    - If a team is hot, project them to outperform their average.
+    
+    FORBIDDEN:
+    - Do NOT output a projection that matches the market line exactly.
+    - You MUST take a stance. 
     
     OUTPUT REQUIREMENTS:
     - Provide a "Median" projection (your true predicted score).
@@ -259,31 +266,25 @@ def run_game_analysis(game_obj):
     
     # ADJUSTMENT: Relaxed thresholds significantly to allow "Lean" bets.
     prompt_c = f"""
-    ROLE: Lead Handicapper.
+    ROLE: High-Volume Handicapper.
     CONTEXT: {final_context}
     
-    TASK: Identify positive expected value (+EV) bets.
+    TASK: Identify ALL +EV bets. We need ACTION.
     
     EVALUATION CRITERIA:
-    1. MINIMUM EDGE (The "Actionable" Zone):
-       - Spread: Market must differ by >= 1.0 points from Projection.
-       - Total: Market must differ by >= 1.5 points from Projection.
-       - If edge is smaller than this, PASS.
+    1. THRESHOLDS: Spread Edge > 0.1 pts, Total Edge > 0.5 pts -> BET.
+    2. LOGIC: If projection differs from line, BET IT.
+    3. SAFETY: Pass if edge > 60% (Hallucination).
     
-    2. CONSENSUS:
-       - If Agent A (Qual) and Agent B (Quant) disagree on direction, Low Confidence only.
-       - If Agent A flags "Model Breakers", Increase Minimum Edge requirements by 50%.
-
-    3. CONFIDENCE SCORING:
-       - High Confidence: Edge > 2.5 pts AND Line is outside Agent B's Floor/Ceiling.
-       - Medium Confidence: Edge > 1.5 pts.
-       - Low Confidence: Edge > 1.0 pts (A "Lean").
-    
-    4. SANITY CHECK:
-       - If calculated edge > 50% (huge outlier), assume hallucination and PASS.
-    
-    OUTPUT:
-    Return a list of 'bets'. If no bets meet criteria, return empty list.
+    OUTPUT REQUIREMENTS:
+    Return a JSON object containing a list of 'bets'.
+    EACH BET OBJECT MUST HAVE THESE EXACT KEYS:
+    - "bet_type": (String) e.g. "Spread", "Total"
+    - "selection": (String) e.g. "Lakers -3.5"
+    - "odds": (String) e.g. "-110"
+    - "value_edge": (Float) e.g. 0.05
+    - "rationale": (String)
+    - "confidence_score": (String) "High", "Medium", or "Low"
     """
     
     res_c = client.models.generate_content(
