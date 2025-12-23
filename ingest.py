@@ -9,11 +9,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
-# FLASK IMPORTS
 from app import app
 from models import db, Pick
-
 from constants import RESEARCH_MODEL, DECISION_MODEL, CURRENT_VERSION, ACTIVE_SPORTS, SPORT_DAYS, REGIONS, MARKETS
+
 load_dotenv()
 
 # CONFIGURATION
@@ -23,30 +22,18 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # ==========================================
-# 1. NEW PYDANTIC SCHEMAS (LIST SUPPORT)
+# 1. PYDANTIC SCHEMAS
 # ==========================================
 
-class ScoreRange(BaseModel):
-    floor: int
-    median: int
-    ceiling: int
-    
 class QualitativeAnalysis(BaseModel):
     matchup: str
     impact_factors: List[str] 
-    model_breakers: bool
-    team_a_motivation: int = Field(ge=1, le=10)
-    team_b_motivation: int = Field(ge=1, le=10)
-
 
 class QuantitativeAnalysis(BaseModel):
     matchup: str
     projected_winner: str
     projected_spread: float
     projected_total: float
-    home_score_range: ScoreRange 
-    away_score_range: ScoreRange
-    implied_spread: float 
     confidence_score: int
 
 class RecommendedBet(BaseModel):
@@ -62,23 +49,18 @@ class RecommendedBet(BaseModel):
 class GameAnalysis(BaseModel):
     matchup: str
     bets: List[RecommendedBet]
-    reason_for_pass: Optional[str] = None 
 
 
 # ==========================================
 # 2. HELPER FUNCTIONS
 # ==========================================
 
-#Gets the game odds from The Odds API
 def get_game_odds(sport_key):
     print(f"  Fetching odds for {sport_key}...")
     url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
     
-    #PARAMETERS
-    # time parameter 
     eastern = ZoneInfo("America/New_York")
     now_est = datetime.now(eastern)
-    # 11:00 AM EST to 11:59PM EST (initialize in EST, convert to UTC, convert to ISO)
     start_est = now_est.replace(hour=11, minute=0, second=0, microsecond=0)
     end_est = now_est.replace(hour=23, minute=59, second=59, microsecond=0)
     start_utc = start_est.astimezone(ZoneInfo("UTC"))
@@ -112,21 +94,16 @@ def format_american_odds(price):
     except:
         return str(price)
 
-# Formats the AI output
 def format_game_data(game):
     home = game['home_team']
     away = game['away_team']
     
-    #get game time
     raw_time = game['commence_time']
-    # Remove the 'Z' and parse
     game_dt = datetime.fromisoformat(raw_time.replace('Z', '+00:00'))
     
-    # Gets all the bookies
     bookie = next((b for b in game['bookmakers'] if b['key'] in ['draftkings', 'fanduel', 'mgm']), game['bookmakers'][0] if game['bookmakers'] else None)
     if not bookie: return None
 
-    # Gets the lines from all the bookies (well-formatted)
     lines = []
     
     for market in bookie['markets']:
@@ -142,10 +119,8 @@ def format_game_data(game):
         elif market['key'] == 'totals':
             p = format_american_odds(market['outcomes'][0]['price'])
             point = market['outcomes'][0]['point']
-            if point > 0:
-                point_str = f"+{point}"
-            else:
-                point_str = str(point)
+            if point > 0: point_str = f"+{point}"
+            else: point_str = str(point)
             lines.append(f"Total: {market['outcomes'][0]['name']} {market['outcomes'][0]['point']} ({p})")
     
     return {
@@ -165,169 +140,113 @@ def run_game_analysis(game_obj):
     lines = game_obj['lines_summary']
     print(f"\nANALYZING: {matchup}")
 
-    # AGENT A: Context
+    # --- AGENT A: Context ---
     prompt_a = f"""
     ROLE: Expert Sports Journalist.
-    TASK: Analyze qualitative factors for: {matchup} ({game_obj['sport']}).
-    
-    FACTORS:
-    1. Injuries (Tier 1 Stars ONLY). Ignore role players.
-    2. Schedule/Rest.
-    3. Motivation.
-    
-    CRITICAL INSTRUCTION:
-    Only set "model_breakers" to True if a TEAM-ALTERING event has occurred (e.g. LeBron James OUT). 
-    Do not flag standard rotation changes.
-
-    OUTPUT SCHEMA (JSON):
-    - impact_factors (list of strings)
-    - model_breakers (boolean)
-    - team_a_motivation (1-10)
-    - team_b_motivation (1-10)
+    TASK: Identify the top 3 critical factors for: {matchup} ({game_obj['sport']}).
+    FOCUS: Injuries, Schedule (Rest), Motivation, Head-to-Head history.
     """
-    
     res_a = client.models.generate_content(
         model=RESEARCH_MODEL,
         contents=prompt_a,
-        config=types.GenerateContentConfig(
-            response_mime_type='application/json'
-
-        )
+        config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QualitativeAnalysis)
     )
-    raw_a = json.loads(res_a.text)
-    while isinstance(raw_a, list):
-        raw_a = raw_a[0] if raw_a else {}
-    qual_data = raw_a
     
+    raw_a = json.loads(res_a.text)
+    qual_data = raw_a[0] if isinstance(raw_a, list) else raw_a
     time.sleep(2)
 
-    # AGENT B: Math
+    # --- AGENT B: Math ---
     prompt_b = f"""
-    ROLE: Professional Sports Better (Quantitative).
-    TASK: Create a scoring projection for: {matchup}.
-    MARKET LINES: {lines}
+    ROLE: Quantitative Sports Modeler.
+    TASK: Create a fair-value projection for: {matchup}.
+    lines: {lines}
     
-    METHODOLOGY:
-    - Base weight on Season Averages.
-    - MULTIPLY weight of Last 5 Games by 3x (Recency Bias).
-    - If a team is hot, project them to outperform their average.
+    NOTE: Be realistic with Total Points. Extreme deviations from the market are rarely correct.
     
-    FORBIDDEN:
-    - Do NOT output a projection that matches the market line exactly.
-    - You MUST take a stance. 
-    
-    OUTPUT REQUIREMENTS:
-    - Provide a "Median" projection (your true predicted score).
-    - Provide a "Floor" and "Ceiling" (10th/90th percentile outcomes).
-    - implied_spread = (Home Median - Away Median).
-    
-    OUTPUT SCHEMA (JSON):
-    - projected_winner (str)
-    - home_score_range {{ "floor": int, "median": int, "ceiling": int }}
-    - away_score_range {{ "floor": int, "median": int, "ceiling": int }}
-    - projected_total_median (int)
-    - implied_spread (float)
-    - projected_spread (float)
-    - projected_total (float)
-    - confidence_score (int 1-10)
+    OUTPUT:
+    1. Who wins and by how much? (Projected Spread)
+    2. Total points scored? (Projected Total)
     """
-
     res_b = client.models.generate_content(
         model=RESEARCH_MODEL,
         contents=prompt_b,
-        config=types.GenerateContentConfig(
-            response_mime_type='application/json'
-        
-        )
+        config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QuantitativeAnalysis)
     )
+    
     raw_b = json.loads(res_b.text)
-    while isinstance(raw_b, list):
-        raw_b = raw_b[0] if raw_b else {}
-    quant_data = raw_b
-  
+    quant_data = raw_b[0] if isinstance(raw_b, list) else raw_b
     time.sleep(2)
 
-    # AGENT C: The Sharp
+    # --- AGENT C: The Sharp ---
+    # Safe access to dict keys using .get() to prevent crashes
+    impact_factors = qual_data.get('impact_factors', [])
+    proj_winner = quant_data.get('projected_winner', 'Unknown')
+    proj_spread = quant_data.get('projected_spread', 0)
+    proj_total = quant_data.get('projected_total', 0)
+
     final_context = f"""
     MATCHUP: {matchup}
     MARKET LINES: {lines}
     
-    REPORT A (Qualitative):
-    - Breakers: {qual_data.get('model_breakers')}
-    - Factors: {json.dumps(qual_data.get('impact_factors'))}
-    - Mot. Gap: {abs(qual_data.get('team_a_motivation', 5) - qual_data.get('team_b_motivation', 5))}
-    
-    REPORT B (Quantitative):
-    - Proj Spread: {quant_data.get('implied_spread')}
-    - Proj Total: {quant_data.get('projected_total')}
-    - Home Range: {quant_data.get('home_score_range')}
-    - Away Range: {quant_data.get('away_score_range')}
+    QUALITATIVE: {json.dumps(impact_factors)}
+    QUANTITATIVE: {proj_winner} by {proj_spread} pts. Total: {proj_total}.
     """
     
-    # ADJUSTMENT: Relaxed thresholds significantly to allow "Lean" bets.
     prompt_c = f"""
-    ROLE: High-Volume Handicapper.
+    ROLE: Lead Handicapper.
     CONTEXT: {final_context}
     
-    TASK: Identify ALL +EV bets. We need ACTION.
+    TASK: Identify ALL bets for this game that have positive expected value (+EV).
     
-    EVALUATION CRITERIA:
-    1. THRESHOLDS: Spread Edge > 0.1 pts, Total Edge > 0.5 pts -> BET.
-    2. LOGIC: If projection differs from line, BET IT.
-    3. SAFETY: Pass if edge > 60% (Hallucination).
-    
-    OUTPUT REQUIREMENTS:
-    Return a JSON object containing a list of 'bets'.
-    EACH BET OBJECT MUST HAVE THESE EXACT KEYS:
-    - "bet_type": (String) e.g. "Spread", "Total"
-    - "selection": (String) e.g. "Lakers -3.5"
-    - "odds": (String) e.g. "-110"
-    - "value_edge": (Float) e.g. 0.05
-    - "rationale": (String)
-    - "confidence_score": (String) "High", "Medium", or "Low"
+    CRITERIA:
+    - Compare Market Lines vs Quantitative Projections.
+    - Factor in Qualitative risks.
+    - Minimum Edge: 3%. If no bets meet this, return an empty list.
+    - TOTALS CHECK: Be more conservative on Total Points edges to avoid hallucinations.
+    - IMPORTANT: Be conservative with 'value_edge'. 0.05 is a 5% edge. 0.50 is 50%.
+    - Output 'odds' in American format (e.g. "-110").
+    - Return a JSON object containing a list of 'bets'.
     """
     
     res_c = client.models.generate_content(
         model=DECISION_MODEL,
         contents=prompt_c,
-        config=types.GenerateContentConfig(
-            response_mime_type='application/json'
- 
-        )
+        config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=GameAnalysis)
     )
-    
+
     raw_c = json.loads(res_c.text)
-    while isinstance(raw_c, list):
-        raw_c = raw_c[0] if raw_c else {}
-    decision = raw_c
-        
+    decision = raw_c[0] if isinstance(raw_c, list) else raw_c
     
-    return decision 
+    return decision
 
 # ==========================================
 # 4. MAIN RUNNER
 # ==========================================
-
 
 def run_ingest():
     print("--- Starting Analysis Pipeline ---")
     
     today_dow = datetime.today().weekday()
     day_name = datetime.today().strftime('%A')
-    print(f"Today is {day_name}")
+    print(f"Today is {day_name} (Day {today_dow})")
 
     all_potential_bets = []
     
     for sport_key in ACTIVE_SPORTS:
+        # Credit Saving Check
         allowed_days = SPORT_DAYS.get(sport_key)
         if allowed_days and today_dow not in allowed_days:
-            print(f"[SKIP] {ACTIVE_SPORTS[sport_key]}")
+            print(f"[SKIP] {ACTIVE_SPORTS[sport_key]} does not play on {day_name}s.")
             continue
 
         raw_games = get_game_odds(sport_key)
-        if not raw_games: continue
+        
+        if not raw_games:
+            print(f"No games found for {sport_key}.")
+            continue
 
-        print(f"Found {len(raw_games)} games for {sport_key}.")
+        print(f"Found {len(raw_games)} games for {sport_key}. Analyzing all...")
 
         for game in raw_games:
             formatted_game = format_game_data(game)
@@ -336,6 +255,7 @@ def run_ingest():
             try:
                 decision = run_game_analysis(formatted_game)
                 
+                # Safe access to 'bets' using .get() because decision is now guaranteed to be a dict (or empty dict)
                 if decision.get('bets'):
                     for bet in decision['bets']:
                         bet_record = {
@@ -350,44 +270,59 @@ def run_ingest():
                             "rationale": bet['rationale']
                         }
                         all_potential_bets.append(bet_record)
-                        print(f"  -> BET FOUND: {bet['selection']} ({bet['confidence_score']})")
+                        print(f"  -> Found potential bet: {bet['selection']} (Edge: {bet['value_edge']:.2%})")
                 else:
-                    print(f"  -> [PASS] {decision.get('reason_for_pass', 'No edge')}")
-    
-                time.sleep(15) # sleep time for ai model limits
+                    print(f"  -> [PASS] No value found.")
+
+                print("  [Waiting 10 for Pro Model Rate Limit...]")
+                time.sleep(10)
                 
             except Exception as e:
-                error_str = str(e)
-                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                    print(f"[RATE LIMIT HIT] Cooling down for 60s...")
-                    time.sleep(60)
-                else:
-                    print(f"[ERROR] {e}")
-                    time.sleep(5)
+                print(f"[ERROR] {e}")
+                time.sleep(60)
             
-    # --- SAVE TO DB ---
-    print(f"\n--- Saving {len(all_potential_bets)} bets ---")
+    # --- STEP 2: FILTER RESULTS ---
+    print(f"\n--- Analysis Complete. Found {len(all_potential_bets)} total opportunities. ---")
+    print("--- Filtering for Top 9 Best Bets ---")
     
-    if all_potential_bets:
-        with app.app_context():
-            db.create_all()
-            for bet in all_potential_bets:
-                new_pick = Pick(
-                    sport=bet['sport'], #type: ignore
-                    matchup=bet['matchup'], #type: ignore
-                    game_time=bet['game_time'], #type: ignore
-                    market_type=bet['market_type'], #type: ignore
-                    selection=bet['selection'], #type: ignore
-                    odds=bet['odds'], #type: ignore
-                    confidence_score=bet['confidence_score'], #type: ignore
-                    value_edge=bet['value_edge'], #type: ignore
-                    model= DECISION_MODEL, #type: ignore
-                    version= CURRENT_VERSION, #type: ignore
-                    rationale=bet['rationale'] #type: ignore
-                )
-                db.session.add(new_pick)
-            db.session.commit()
+    high_confidence_bets = [
+            bet for bet in all_potential_bets 
+            if bet.get('confidence_score') in ['Medium', 'High']
+    ]
     
+    sorted_bets = sorted(
+        high_confidence_bets, 
+        key=lambda x: x.get('value_edge', 0), 
+        reverse=True
+    )
+    top_9_bets = sorted_bets[:9]
+    
+    # --- STEP 3: OPEN DB CONNECTION AND SAVE QUICKLY ---
+    print("--- Saving to Database ---")
+    
+    with app.app_context():
+        db.create_all() # Ensure tables exist
+        
+        for bet in top_9_bets:
+            new_pick = Pick(
+                sport=bet['sport'], #type: ignore
+                matchup=bet['matchup'], #type: ignore
+                game_time=bet['game_time'], #type: ignore
+                market_type=bet['market_type'], #type: ignore
+                selection=bet['selection'], #type: ignore
+                odds=bet['odds'], #type: ignore
+                confidence_score=bet['confidence_score'], #type: ignore
+                value_edge=bet['value_edge'], #type: ignore
+                model= DECISION_MODEL, #type: ignore
+                version= CURRENT_VERSION, #type: ignore
+                rationale=bet['rationale'] #type: ignore
+            )
+
+            db.session.add(new_pick)
+            print(f"[SAVED TO DB] {bet['selection']} (Edge: {bet['value_edge']:.2%})")
+
+        db.session.commit()
+        
     print("--- DONE ---\n")
 
 if __name__ == "__main__":
