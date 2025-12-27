@@ -1,11 +1,11 @@
 name: Daily Betting AI
 
 on:
-  # Schedule: Runs at 13:00 UTC daily
-  # 13:00 UTC = 8:00 AM EST (Standard Time)
-  # 13:00 UTC = 9:00 AM EDT (Daylight Savings Time)
+  # Schedule: Runs at 14:00 UTC daily
+  # 14:00 UTC = 9:00 AM EST (Standard Time)
+  # 14:00 UTC = 10:00 AM EDT (Daylight Savings Time)
   schedule:
-    - cron: '0 13 * * *'
+    - cron: '0 14 * * *'
   
   # Manual Trigger: Allows you to click a "Run workflow" button on GitHub for testing
   workflow_dispatch:
