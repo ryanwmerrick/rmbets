@@ -5,7 +5,7 @@ RESEARCH_MODEL = "gemini-2.5-flash"
 DECISION_MODEL = "gemini-2.5-pro"
 
 # High reasoning, very low rate limit (2 RPM)
-CURRENT_VERSION = "v1.1"
+CURRENT_VERSION = "v1.3"
 
 #REMEMBER:
 # - Each active sport costs 3 API tokens to find the odds (if there are games on that day)

@@ -143,9 +143,14 @@ def run_game_analysis(game_obj):
     # --- AGENT A: Context ---
     prompt_a = f"""
     ROLE: Expert Sports Journalist.
-    TASK: Identify the top 3 critical factors for: {matchup} ({game_obj['sport']}).
-    FOCUS: Injuries, Schedule (Rest), Motivation, Head-to-Head history.
+    TASK: Identify the top 3 "Win Conditions" for: {matchup} ({game_obj['sport']}).
+
+    FOCUS: 
+    - Which team is actually playing better right now? (Momentum)
+    - Who needs this game more? (Motivation)
+    - Are there critical injuries that kill a team's chances?
     """
+    
     res_a = client.models.generate_content(
         model=RESEARCH_MODEL,
         contents=prompt_a,
@@ -153,17 +158,23 @@ def run_game_analysis(game_obj):
     )
     
     raw_a = json.loads(res_a.text)
-    qual_data = raw_a[0] if isinstance(raw_a, list) else raw_a
-    time.sleep(2)
+    # UNWRAPPER: Handle if AI wraps response in a list
+    while isinstance(raw_a, list):
+        raw_a = raw_a[0] if raw_a else {}
+    qual_data = raw_a
+    time.sleep(1)
 
     # --- AGENT B: Math ---
     prompt_b = f"""
     ROLE: Quantitative Sports Modeler.
-    TASK: Create a fair-value projection for: {matchup}.
+    TASK: Create a projection for: {matchup}.
     lines: {lines}
-    
-    NOTE: Be realistic with Total Points. Extreme deviations from the market are rarely correct.
-    
+
+    STRATEGY: 
+    - Weigh LAST 10 GAMES more heavily than the full season. 
+    - We want to back teams that are currently hot, not teams that were good 3 months ago.
+    - Be realistic with Total Points (avoid outliers).
+
     OUTPUT:
     1. Who wins and by how much? (Projected Spread)
     2. Total points scored? (Projected Total)
@@ -175,15 +186,18 @@ def run_game_analysis(game_obj):
     )
     
     raw_b = json.loads(res_b.text)
-    quant_data = raw_b[0] if isinstance(raw_b, list) else raw_b
-    time.sleep(2)
+    # UNWRAPPER: Handle if AI wraps response in a list
+    while isinstance(raw_b, list):
+        raw_b = raw_b[0] if raw_b else {}
+    quant_data = raw_b
+    time.sleep(1)
 
     # --- AGENT C: The Sharp ---
     # Safe access to dict keys using .get() to prevent crashes
-    impact_factors = qual_data.get('impact_factors', [])
-    proj_winner = quant_data.get('projected_winner', 'Unknown')
-    proj_spread = quant_data.get('projected_spread', 0)
-    proj_total = quant_data.get('projected_total', 0)
+    impact_factors = qual_data.get('impact_factors', []) if isinstance(qual_data, dict) else []
+    proj_winner = quant_data.get('projected_winner', 'Unknown') if isinstance(quant_data, dict) else 'Unknown'
+    proj_spread = quant_data.get('projected_spread', 0) if isinstance(quant_data, dict) else 0
+    proj_total = quant_data.get('projected_total', 0) if isinstance(quant_data, dict) else 0
 
     final_context = f"""
     MATCHUP: {matchup}
@@ -196,16 +210,28 @@ def run_game_analysis(game_obj):
     prompt_c = f"""
     ROLE: Lead Handicapper.
     CONTEXT: {final_context}
-    
-    TASK: Identify ALL bets for this game that have positive expected value (+EV).
-    
+
+    TASK: Identify bets that balance VALUE with HIGH WIN PROBABILITY.
+
+    PHILOSOPHY:
+    - We are losing money on "value" underdogs that don't cover. 
+    - Shift strategy to: "Who is most likely to cover?"
+    - Better to bet a small edge on a hot team than a big edge on a cold team.
+
     CRITERIA:
-    - Compare Market Lines vs Quantitative Projections.
-    - Factor in Qualitative risks.
-    - Minimum Edge: 3%. If no bets meet this, return an empty list.
-    - TOTALS CHECK: Be more conservative on Total Points edges to avoid hallucinations.
-    - IMPORTANT: Be conservative with 'value_edge'. 0.05 is a 5% edge. 0.50 is 50%.
-    - Output 'odds' in American format (e.g. "-110").
+    1. UNDERDOGS: Only bet an underdog if the edge is > 5.0 points. (Prevent reaching).
+    2. FAVORITES: If the favorite is playing well (see Qualitative), bet them even if edge is small (> 1.5 points).
+    3. TOTALS: Be conservative. Only bet if edge > 3.0 points.
+    4. CONFIDENCE: If Qualitative says Team A is struggling, DO NOT BET ON THEM even if Math says yes.
+
+    CRITICAL FORMATTING RULES:
+    - 'value_edge' must be a DECIMAL representation of percentage.
+    - Example: 5% edge = 0.05.
+    - Example: 10% edge = 0.10.
+    - DO NOT use spread points as value_edge (e.g. do not put 5.0 for 5 points).
+    - If calculated edge is > 0.40 (40%), assume it is a hallucination and cap it or PASS.
+
+    OUTPUT:
     - Return a JSON object containing a list of 'bets'.
     """
     
@@ -216,7 +242,10 @@ def run_game_analysis(game_obj):
     )
 
     raw_c = json.loads(res_c.text)
-    decision = raw_c[0] if isinstance(raw_c, list) else raw_c
+    # UNWRAPPER: Handle if AI wraps response in a list
+    while isinstance(raw_c, list):
+        raw_c = raw_c[0] if raw_c else {}
+    decision = raw_c
     
     return decision
 
@@ -225,7 +254,7 @@ def run_game_analysis(game_obj):
 # ==========================================
 
 def run_ingest():
-    print("--- Starting Analysis Pipeline ---")
+    print(f"--- Starting Analysis Pipeline ({CURRENT_VERSION}) ---")
     
     today_dow = datetime.today().weekday()
     day_name = datetime.today().strftime('%A')
@@ -256,7 +285,7 @@ def run_ingest():
                 decision = run_game_analysis(formatted_game)
                 
                 # Safe access to 'bets' using .get() because decision is now guaranteed to be a dict (or empty dict)
-                if decision.get('bets'):
+                if isinstance(decision, dict) and decision.get('bets'):
                     for bet in decision['bets']:
                         bet_record = {
                             "sport": formatted_game['sport'],
