@@ -142,13 +142,14 @@ def run_game_analysis(game_obj):
 
     # --- AGENT A: Context ---
     prompt_a = f"""
-    ROLE: Expert Sports Journalist.
-    TASK: Identify the top 3 "Win Conditions" for: {matchup} ({game_obj['sport']}).
+    ROLE: Expert Sports Journalist & Sharp Money Analyst.
+    TASK: Identify the top 3 "Win Conditions" and evaluate Expert Sentiment for: {matchup} ({game_obj['sport']}).
 
     FOCUS: 
     - Which team is actually playing better right now? (Momentum)
     - Who needs this game more? (Motivation)
     - Are there critical injuries that kill a team's chances?
+    - EXPERT CONSENSUS: Based on team perception vs metrics, which side would professional bettors likely be on?
     """
     
     res_a = client.models.generate_content(
@@ -217,12 +218,14 @@ def run_game_analysis(game_obj):
     - We are losing money on "value" underdogs that don't cover. 
     - Shift strategy to: "Who is most likely to cover?"
     - Better to bet a small edge on a hot team than a big edge on a cold team.
+    - FACTOR IN EXPERT OPINION: If the Qualitative report says Sharps/Experts like a side, give that side a boost.
 
     CRITERIA:
     1. UNDERDOGS: Only bet an underdog if the edge is > 5.0 points. (Prevent reaching).
     2. FAVORITES: If the favorite is playing well (see Qualitative), bet them even if edge is small (> 1.5 points).
     3. TOTALS: Be conservative. Only bet if edge > 3.0 points.
     4. CONFIDENCE: If Qualitative says Team A is struggling, DO NOT BET ON THEM even if Math says yes.
+    5. EXPERT ALIGNMENT: If the Qualitative report indicates "Sharp Money" or "Expert Consensus" is on a team, consider that a High Confidence signal.
 
     CRITICAL FORMATTING RULES:
     - 'value_edge' must be a DECIMAL representation of percentage.
