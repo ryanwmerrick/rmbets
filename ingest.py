@@ -27,7 +27,9 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 class QualitativeAnalysis(BaseModel):
     matchup: str
-    impact_factors: List[str] 
+    impact_factors: List[str]
+    public_sentiment: str = Field(description="Which side does the general public likely favor?")
+    sharp_sentiment: str = Field(description="Which side would professional bettors likely favor?") 
 
 class QuantitativeAnalysis(BaseModel):
     matchup: str
@@ -45,7 +47,6 @@ class RecommendedBet(BaseModel):
     rationale: str
     confidence_score: str # "High", "Medium", "Low"
 
-# The AI returns this Wrapper, which contains a LIST of bets
 class GameAnalysis(BaseModel):
     matchup: str
     bets: List[RecommendedBet]
@@ -132,7 +133,7 @@ def format_game_data(game):
     }
 
 # ==========================================
-# 3. THE 3-AGENT PIPELINE
+# 3. THE 3-AGENT PIPELINE (v1.5 Sharp Follower)
 # ==========================================
 
 def run_game_analysis(game_obj):
@@ -140,16 +141,20 @@ def run_game_analysis(game_obj):
     lines = game_obj['lines_summary']
     print(f"\nANALYZING: {matchup}")
 
-    # --- AGENT A: Context ---
+    # --- AGENT A: QUALITATIVE ---
     prompt_a = f"""
-    ROLE: Expert Sports Journalist & Sharp Money Analyst.
-    TASK: Identify the top 3 "Win Conditions" and evaluate Expert Sentiment for: {matchup} ({game_obj['sport']}).
-
-    FOCUS: 
-    - Which team is actually playing better right now? (Momentum)
-    - Who needs this game more? (Motivation)
-    - Are there critical injuries that kill a team's chances?
-    - EXPERT CONSENSUS: Based on team perception vs metrics, which side would professional bettors likely be on?
+    ROLE: Expert Sports Handicapper & Sharp Money Analyst.
+    TASK: Analyze the "Sharp vs. Public" dynamic for: {matchup} ({game_obj['sport']}).
+    
+    FOCUS:
+    1. Identify who the "Public" (casual bettor) is likely backing based on big names/recent TV performance.
+    2. Identify who the "Sharps" (pros) would likely back based on value, buy-low spots, or injuries.
+    3. List critical injuries/rest factors.
+    
+    OUTPUT SCHEMA (JSON):
+    - impact_factors (list)
+    - public_sentiment (string): e.g. "Heavy on Lakers"
+    - sharp_sentiment (string): e.g. "Contrarian value on Pistons"
     """
     
     res_a = client.models.generate_content(
@@ -158,24 +163,24 @@ def run_game_analysis(game_obj):
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QualitativeAnalysis)
     )
     
+    # LIST FIX
     raw_a = json.loads(res_a.text)
-    # UNWRAPPER: Handle if AI wraps response in a list
     while isinstance(raw_a, list):
         raw_a = raw_a[0] if raw_a else {}
     qual_data = raw_a
-    time.sleep(1)
+    time.sleep(2)
 
-    # --- AGENT B: Math ---
+    # --- AGENT B: QUANTITATIVE ---
     prompt_b = f"""
     ROLE: Quantitative Sports Modeler.
     TASK: Create a projection for: {matchup}.
     lines: {lines}
-
+    
     STRATEGY: 
-    - Weigh LAST 10 GAMES more heavily than the full season. 
-    - We want to back teams that are currently hot, not teams that were good 3 months ago.
-    - Be realistic with Total Points (avoid outliers).
-
+    - Weigh LAST 10 GAMES more heavily.
+    - Be realistic with Total Points (regress to mean).
+    - If a team is on a B2B (Back-to-Back), penalize their score by 5%.
+    
     OUTPUT:
     1. Who wins and by how much? (Projected Spread)
     2. Total points scored? (Projected Total)
@@ -186,16 +191,19 @@ def run_game_analysis(game_obj):
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=QuantitativeAnalysis)
     )
     
+    # LIST FIX
     raw_b = json.loads(res_b.text)
-    # UNWRAPPER: Handle if AI wraps response in a list
     while isinstance(raw_b, list):
         raw_b = raw_b[0] if raw_b else {}
     quant_data = raw_b
-    time.sleep(1)
+    time.sleep(2)
 
-    # --- AGENT C: The Sharp ---
-    # Safe access to dict keys using .get() to prevent crashes
+    # --- AGENT C: DECISION ---
+    # Safe getters
     impact_factors = qual_data.get('impact_factors', []) if isinstance(qual_data, dict) else []
+    public_bias = qual_data.get('public_sentiment', 'Unknown') if isinstance(qual_data, dict) else 'Unknown'
+    sharp_bias = qual_data.get('sharp_sentiment', 'Unknown') if isinstance(qual_data, dict) else 'Unknown'
+    
     proj_winner = quant_data.get('projected_winner', 'Unknown') if isinstance(quant_data, dict) else 'Unknown'
     proj_spread = quant_data.get('projected_spread', 0) if isinstance(quant_data, dict) else 0
     proj_total = quant_data.get('projected_total', 0) if isinstance(quant_data, dict) else 0
@@ -204,36 +212,30 @@ def run_game_analysis(game_obj):
     MATCHUP: {matchup}
     MARKET LINES: {lines}
     
-    QUALITATIVE: {json.dumps(impact_factors)}
-    QUANTITATIVE: {proj_winner} by {proj_spread} pts. Total: {proj_total}.
+    SENTIMENT: Public likes: {public_bias}. Sharps likely: {sharp_bias}.
+    FACTORS: {json.dumps(impact_factors)}
+    MATH PROJECTION: {proj_winner} by {proj_spread} pts. Total: {proj_total}.
     """
     
     prompt_c = f"""
     ROLE: Lead Handicapper.
     CONTEXT: {final_context}
-
-    TASK: Identify bets that balance VALUE with HIGH WIN PROBABILITY.
-
-    PHILOSOPHY:
-    - We are losing money on "value" underdogs that don't cover. 
-    - Shift strategy to: "Who is most likely to cover?"
-    - Better to bet a small edge on a hot team than a big edge on a cold team.
-    - FACTOR IN EXPERT OPINION: If the Qualitative report says Sharps/Experts like a side, give that side a boost.
-
-    CRITERIA:
-    1. UNDERDOGS: Only bet an underdog if the edge is > 5.0 points. (Prevent reaching).
-    2. FAVORITES: If the favorite is playing well (see Qualitative), bet them even if edge is small (> 1.5 points).
-    3. TOTALS: Be conservative. Only bet if edge > 3.0 points.
-    4. CONFIDENCE: If Qualitative says Team A is struggling, DO NOT BET ON THEM even if Math says yes.
-    5. EXPERT ALIGNMENT: If the Qualitative report indicates "Sharp Money" or "Expert Consensus" is on a team, consider that a High Confidence signal.
-
-    CRITICAL FORMATTING RULES:
-    - 'value_edge' must be a DECIMAL representation of percentage.
-    - Example: 5% edge = 0.05.
-    - Example: 10% edge = 0.10.
-    - DO NOT use spread points as value_edge (e.g. do not put 5.0 for 5 points).
-    - If calculated edge is > 0.40 (40%), assume it is a hallucination and cap it or PASS.
-
+    
+    TASK: Identify bets where the MATH aligns with the SHARP sentiment.
+    
+    STRATEGY (The "Sharp Follower" Method):
+    1. FADE THE PUBLIC: Be skeptical if the Math backs a very popular public favorite. 
+    2. FOLLOW THE SHARPS: If 'Sharp Sentiment' matches the 'Math Projection', this is a HIGH CONFIDENCE bet.
+    3. IGNORE NOISE: If Sharp sentiment and Math disagree, PASS.
+    
+    THRESHOLDS:
+    - Spread Edge > 1.5 points.
+    - Total Edge > 2.0 points.
+    
+    CRITICAL FORMATTING:
+    - 'value_edge' must be a decimal (e.g. 0.05 for 5%). 
+    - If calculated edge is > 0.40 (40%), assume hallucination and PASS.
+    
     OUTPUT:
     - Return a JSON object containing a list of 'bets'.
     """
@@ -243,9 +245,9 @@ def run_game_analysis(game_obj):
         contents=prompt_c,
         config=types.GenerateContentConfig(response_mime_type='application/json', response_schema=GameAnalysis)
     )
-
+    
+    # LIST FIX
     raw_c = json.loads(res_c.text)
-    # UNWRAPPER: Handle if AI wraps response in a list
     while isinstance(raw_c, list):
         raw_c = raw_c[0] if raw_c else {}
     decision = raw_c
@@ -257,7 +259,7 @@ def run_game_analysis(game_obj):
 # ==========================================
 
 def run_ingest():
-    print(f"--- Starting Analysis Pipeline ({CURRENT_VERSION}) ---")
+    print("--- Starting Analysis Pipeline (v1.5 Sharp Follower) ---")
     
     today_dow = datetime.today().weekday()
     day_name = datetime.today().strftime('%A')
@@ -266,17 +268,13 @@ def run_ingest():
     all_potential_bets = []
     
     for sport_key in ACTIVE_SPORTS:
-        # Credit Saving Check
         allowed_days = SPORT_DAYS.get(sport_key)
         if allowed_days and today_dow not in allowed_days:
             print(f"[SKIP] {ACTIVE_SPORTS[sport_key]} does not play on {day_name}s.")
             continue
 
         raw_games = get_game_odds(sport_key)
-        
-        if not raw_games:
-            print(f"No games found for {sport_key}.")
-            continue
+        if not raw_games: continue
 
         print(f"Found {len(raw_games)} games for {sport_key}. Analyzing all...")
 
@@ -287,7 +285,6 @@ def run_ingest():
             try:
                 decision = run_game_analysis(formatted_game)
                 
-                # Safe access to 'bets' using .get() because decision is now guaranteed to be a dict (or empty dict)
                 if isinstance(decision, dict) and decision.get('bets'):
                     for bet in decision['bets']:
                         bet_record = {
@@ -302,59 +299,40 @@ def run_ingest():
                             "rationale": bet['rationale']
                         }
                         all_potential_bets.append(bet_record)
-                        print(f"  -> Found potential bet: {bet['selection']} (Edge: {bet['value_edge']:.2%})")
+                        print(f"  -> BET FOUND: {bet['selection']} ({bet['confidence_score']})")
                 else:
-                    print(f"  -> [PASS] No value found.")
+                    print(f"  -> [PASS] {decision.get('reason_for_pass', 'No edge')}")
 
-                print("  [Waiting 10 for Pro Model Rate Limit...]")
+                print("  [Waiting 10s...]")
                 time.sleep(10)
                 
             except Exception as e:
                 print(f"[ERROR] {e}")
                 time.sleep(60)
             
-    # --- STEP 2: FILTER RESULTS ---
-    print(f"\n--- Analysis Complete. Found {len(all_potential_bets)} total opportunities. ---")
-    print("--- Filtering for Top 9 Best Bets ---")
+    # --- SAVE TO DB ---
+    print(f"\n--- Saving {len(all_potential_bets)} bets ---")
     
-    high_confidence_bets = [
-            bet for bet in all_potential_bets 
-            if bet.get('confidence_score') in ['Medium', 'High']
-    ]
+    if all_potential_bets:
+        with app.app_context():
+            db.create_all()
+            for bet in all_potential_bets:
+                new_pick = Pick(
+                    sport=bet['sport'], #type: ignore
+                    matchup=bet['matchup'], #type: ignore
+                    game_time=bet['game_time'], #type: ignore
+                    market_type=bet['market_type'], #type: ignore
+                    selection=bet['selection'], #type: ignore
+                    odds=bet['odds'], #type: ignore
+                    confidence_score=bet['confidence_score'], #type: ignore
+                    value_edge=bet['value_edge'], #type: ignore
+                    model= DECISION_MODEL, #type: ignore
+                    version= CURRENT_VERSION, #type: ignore
+                    rationale=bet['rationale'] #type: ignore
+                )
+                db.session.add(new_pick)
+            db.session.commit()
     
-    sorted_bets = sorted(
-        high_confidence_bets, 
-        key=lambda x: x.get('value_edge', 0), 
-        reverse=True
-    )
-    top_9_bets = sorted_bets[:9]
-    
-    # --- STEP 3: OPEN DB CONNECTION AND SAVE QUICKLY ---
-    print("--- Saving to Database ---")
-    
-    with app.app_context():
-        db.create_all() # Ensure tables exist
-        
-        for bet in top_9_bets:
-            new_pick = Pick(
-                sport=bet['sport'], #type: ignore
-                matchup=bet['matchup'], #type: ignore
-                game_time=bet['game_time'], #type: ignore
-                market_type=bet['market_type'], #type: ignore
-                selection=bet['selection'], #type: ignore
-                odds=bet['odds'], #type: ignore
-                confidence_score=bet['confidence_score'], #type: ignore
-                value_edge=bet['value_edge'], #type: ignore
-                model= DECISION_MODEL, #type: ignore
-                version= CURRENT_VERSION, #type: ignore
-                rationale=bet['rationale'] #type: ignore
-            )
-
-            db.session.add(new_pick)
-            print(f"[SAVED TO DB] {bet['selection']} (Edge: {bet['value_edge']:.2%})")
-
-        db.session.commit()
-        
     print("--- DONE ---\n")
 
 if __name__ == "__main__":
