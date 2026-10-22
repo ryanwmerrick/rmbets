@@ -58,8 +58,8 @@
       <h2>How it works</h2>
       <div class="how">
         <div class="how-grid">
-          <div class="how-card" style="--c:var(--c-ai_analyst)"><h3>AI analyst</h3><p>Reads today's injury reports, records and rest from ESPN, adjusts the market's odds by up to 5 points, and bets when it sees an edge of 3% or more.</p></div>
-          <div class="how-card" style="--c:var(--c-market_ev)"><h3>Market EV</h3><p>No AI. Compares every sportsbook to the sharpest market (Pinnacle) and bets prices that are at least 2.5% too generous.</p></div>
+          <div class="how-card" style="--c:var(--c-ai_analyst)"><h3>AI analyst</h3><p>Reads today's injury reports, records and rest from ESPN, adjusts the market's odds by up to 5 points, and bets moneylines when it sees an edge of 3% or more.</p></div>
+          <div class="how-card" style="--c:var(--c-market_ev)"><h3>Market EV</h3><p>No AI. Compares every sportsbook to the sharpest market (Pinnacle) and bets prices that are at least 2.5% too generous, on moneylines, spreads and totals.</p></div>
           <div class="how-card" style="--c:var(--c-baseline_fav)"><h3>Favorite</h3><p>Control group. Always bets the favorite to win.</p></div>
           <div class="how-card" style="--c:var(--c-baseline_random)"><h3>Coin flip</h3><p>Control group. Bets a random side. Any real strategy should beat this.</p></div>
         </div>
@@ -72,9 +72,12 @@
           </ol>
           <h3 class="mini-h">Terms</h3>
           <dl class="terms">
-            <dt>Edge</dt><dd>How much better our price is than the fair odds.</dd>
-            <dt>ROI</dt><dd>Profit as a share of everything bet.</dd>
-            <dt>CLV</dt><dd>Did we beat the closing line? Positive CLV over time is the best sign of real skill.</dd>
+            <dt>Moneyline</dt><dd>Bet on who wins the game.</dd>
+            <dt>Spread</dt><dd>Bet on the margin. "+6.5" means that team can lose by up to 6 and still win the bet.</dd>
+            <dt>Total</dt><dd>Bet on whether the combined score goes over or under a number.</dd>
+            <dt>Edge (EV)</dt><dd>Expected Value: how much better our price is than the fair odds, as a percent.</dd>
+            <dt>ROI</dt><dd>Return on Investment: profit as a share of everything bet.</dd>
+            <dt>CLV</dt><dd>Closing Line Value: did we get a better price than where the odds ended up right before the game? Positive CLV over time is the best sign of real skill.</dd>
           </dl>
         </div>
       </div>

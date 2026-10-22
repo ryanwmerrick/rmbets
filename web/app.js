@@ -86,7 +86,7 @@ function logo(t) {
 function teamRow(b, teamName) {
   const t = teamInfo(b.league, teamName);
   const picked = b.market !== "totals" && b.outcome === teamName;
-  const tag = !picked ? "" : b.market === "spreads" ? `${b.point > 0 ? "+" : ""}${b.point}` : "Pick";
+  const tag = !picked ? "" : b.market === "spreads" ? `${b.point > 0 ? "+" : ""}${b.point}` : "Win";
   return `<div class="team${picked ? " picked" : ""}">${logo(t)}
     <div class="tn"><b>${esc(t.short)}</b>${t.record ? `<span>${esc(t.record)}</span>` : ""}</div>
     ${tag ? `<span class="pick-tag">${tag}</span>` : ""}
@@ -109,8 +109,17 @@ function reasonFor(b) {
     <p>Pinnacle's odds, with the bookmaker's margin removed, put a fair price at ${toAmerican(1 / fairProb)}. ${esc(book(b.book))} pays ${odds(b.price_american)}, about ${(b.ev * 100).toFixed(1)}% more than it should over the long run.</p>`;
 }
 
+// The bet in plain words, e.g. "Moneyline · Nuggets win", "Spread · Nuggets +6.5", "Total · Over 6.5 goals"
+function betLine(b) {
+  const team = esc(teamInfo(b.league, b.outcome).short);
+  if (b.market === "h2h") return ["Moneyline", `${team} win`];
+  if (b.market === "spreads") return ["Spread", `${team} ${b.point > 0 ? "+" : ""}${b.point}`];
+  return ["Total", `${esc(b.outcome)} ${b.point} ${b.league === "NHL" ? "goals" : "points"}`];
+}
+
 function gameCard(b) {
-  const pickLine = b.market === "totals" ? `<div class="total-line">${esc(b.outcome)} ${b.point} total</div>` : "";
+  const [betType, betText] = betLine(b);
+  const pickLine = `<div class="bet-line"><span>${betType}</span><b>${betText}</b></div>`;
   return `<article class="game" style="--c:var(--c-${b.strategy})" tabindex="0" role="button" aria-pressed="false" aria-label="${esc(pick(b).replace(/<[^>]+>/g, ""))}. Tap to see why.">
     <div class="flip">
       <div class="face front">

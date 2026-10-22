@@ -64,7 +64,7 @@ section { margin-top: 32px; min-width: 0; }
 /* Today's bets: scoreboard cards */
 .rail { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 12px; margin: 0 -2px; scrollbar-width: thin; }
 .rail .none { color: var(--muted); padding: 16px; }
-.game { flex: 0 0 250px; height: 212px; scroll-snap-align: start; perspective: 1000px; cursor: pointer; outline: none; }
+.game { flex: 0 0 250px; height: 240px; scroll-snap-align: start; perspective: 1000px; cursor: pointer; outline: none; }
 .game:focus-visible .face { outline: 2px solid var(--c); outline-offset: 2px; }
 .flip { position: relative; width: 100%; height: 100%; transition: transform 0.45s ease; transform-style: preserve-3d; }
 .game.flipped .flip { transform: rotateY(180deg); }
@@ -82,7 +82,9 @@ section { margin-top: 32px; min-width: 0; }
 .tn span { font-size: 11.5px; color: var(--muted); }
 .team:not(.picked) .tn b { font-weight: 600; color: var(--muted); }
 .pick-tag { margin-left: auto; background: var(--c); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
-.total-line { margin: 0 14px; font-size: 13px; font-weight: 700; color: var(--c); }
+.bet-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 6px 12px 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--c) 10%, transparent); font-size: 13px; }
+.bet-line span { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.bet-line b { color: var(--ink); }
 .g-bottom { display: grid; grid-template-columns: repeat(3, 1fr) auto; align-items: end; gap: 6px; padding: 8px 12px 10px; margin-top: 6px; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .g-bottom span { display: block; color: var(--muted); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 .flip-hint { color: var(--muted); font-size: 15px; align-self: center; }
