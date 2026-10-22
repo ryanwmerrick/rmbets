@@ -18,7 +18,7 @@ Results are scored on ROI, closing line value (CLV), and for the AI, a Brier sco
 | Workflow | When | What |
 | --- | --- | --- |
 | `daily.yml` | 15:00 UTC | Grades finished games, snapshots odds, runs every portfolio, publishes the dashboard |
-| `snapshot.yml` | 23:00 UTC | Moneyline snapshot near game time for CLV, then publishes the dashboard |
+| `snapshot.yml` | 21:30 UTC | Moneyline snapshot near game time for CLV, then publishes the dashboard |
 | `pages.yml` | Push to `web/` | Republishes the dashboard |
 
 - **Database:** Neon Postgres, schema `sportpredict` (`db/001_init.sql`). v1's `public.pick` table is untouched and exposed through the `v1_picks` view.

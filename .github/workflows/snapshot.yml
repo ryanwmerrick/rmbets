@@ -2,7 +2,7 @@ name: Evening snapshot
 
 on:
   schedule:
-    - cron: "0 23 * * *"   # 6-7pm ET: moneyline snapshot for CLV
+    - cron: "30 21 * * *"   # 4:30-5:30pm ET, ahead of 7pm starts even if GitHub runs late
   workflow_dispatch:
 
 permissions:
