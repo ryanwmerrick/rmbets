@@ -19,3 +19,7 @@ instance/
 # IDE settings (Optional)
 .vscode/
 .idea/
+# v2
+site/
+.pytest_cache/
+.claude/

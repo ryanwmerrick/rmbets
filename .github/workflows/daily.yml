@@ -1,0 +1,49 @@
+name: Daily picks
+
+on:
+  schedule:
+    - cron: "0 15 * * *"   # 10-11am ET: grade, snapshot odds, make picks
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sportpredict
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pytest -q tests
+      - name: Grade, snapshot odds, make picks
+        run: python -m sportpredict.jobs.daily
+      - name: Export dashboard data
+        if: always()
+        run: |
+          python -m sportpredict.jobs.export site/data.json
+          cp web/* site/
+      - uses: actions/upload-pages-artifact@v4
+        if: always()
+        with:
+          path: site
+      - id: deploy
+        if: always()
+        uses: actions/deploy-pages@v4

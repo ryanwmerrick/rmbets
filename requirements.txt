@@ -1,9 +1,6 @@
-flask
-flask-sqlalchemy
-requests
-google-genai     
-python-dotenv
-apscheduler
-psycopg2-binary #neon db
-pytz #for conversion to EST
-gunicorn
+requests==2.34.2
+psycopg[binary]==3.3.6
+google-genai==2.32.0
+pydantic==2.14.1
+python-dotenv==1.2.4
+pytest==9.1.1

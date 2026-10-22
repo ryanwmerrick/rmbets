@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sportPredict v2</title>
+  <meta name="description" content="Paper-betting experiment: does an AI analyst beat the betting market? NBA and NHL.">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="wrap">
+    <div>
+      <h1>sportPredict <span class="tag">v2</span></h1>
+      <p class="sub">Paper bets on NBA and NHL. Does an AI analyst add anything the betting market doesn't already know?</p>
+    </div>
+    <p class="updated" id="updated">Loading…</p>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>Portfolios</h2>
+      <p class="lead">Four strategies bet the same games at flat 1-unit stakes, using real prices from the odds feed.</p>
+      <div class="cards" id="cards"></div>
+    </section>
+
+    <section>
+      <h2>Cumulative units</h2>
+      <div class="panel chart-panel"><canvas id="units-chart" aria-label="Cumulative units by portfolio"></canvas>
+        <p class="empty" id="chart-empty" hidden>No graded bets yet. The chart fills in after the first games finish.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Today's bets</h2>
+      <div class="filters" id="today-filters" role="tablist"></div>
+      <div class="panel table-wrap"><table id="today"></table></div>
+    </section>
+
+    <section>
+      <h2>AI analyst's reads</h2>
+      <p class="lead">For every game, Gemini starts from the market's fair probability and adjusts it using ESPN injury reports, records and rest. Its probability is capped at ±5 points from the market.</p>
+      <div class="reads" id="reads"></div>
+    </section>
+
+    <section>
+      <h2>AI vs market accuracy</h2>
+      <p class="lead">Brier score on completed games: lower is better. If the AI can't beat the market here, it isn't adding information.</p>
+      <div class="panel table-wrap"><table id="brier"></table></div>
+    </section>
+
+    <section>
+      <h2>Recent results</h2>
+      <div class="panel table-wrap"><table id="recent"></table></div>
+    </section>
+
+    <section class="two-col">
+      <div>
+        <h2>v1 archive</h2>
+        <div class="panel" id="v1"></div>
+      </div>
+      <div>
+        <h2>Job health</h2>
+        <div class="panel table-wrap"><table id="runs"></table></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>How it works</h2>
+      <div class="panel method">
+        <p><strong>Fair line.</strong> Pinnacle's prices are de-vigged into fair win probabilities. If Pinnacle has no line, the median across at least 3 books is used.</p>
+        <p><strong>market_ev</strong> bets the best US-book price whenever its expected value against the fair line is at least 2.5%. No AI.</p>
+        <p><strong>ai_analyst</strong> bets moneylines when its adjusted probability gives at least 3% EV at the best price. It never writes or sees a price.</p>
+        <p><strong>baseline_fav</strong> and <strong>baseline_random</strong> are control groups: always the favorite, and a coin flip.</p>
+        <p><strong>CLV</strong> (closing line value) compares the price we got with the fair price at the evening snapshot. Positive CLV over hundreds of bets is the clearest sign of real skill.</p>
+        <p>Each version is frozen until it reaches 300 graded bets. 100 bets carry about ±9.5% ROI noise.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">Paper bets only. No real money. Data: The Odds API, ESPN. AI: Gemini Flash.</footer>
+</body>
+</html>
