@@ -19,6 +19,7 @@ Results are scored on ROI, closing line value (CLV), and for the AI, a Brier sco
 | --- | --- | --- |
 | `daily.yml` | 15:00 UTC | Grades finished games from ESPN's scoreboard, snapshots odds for leagues playing that day, runs every portfolio, publishes the dashboard |
 | `snapshot.yml` | 21:30 UTC daily, 16:15 UTC Sundays | Moneyline snapshot near game time for CLV, then publishes the dashboard |
+| `grade.yml` | Every 30 min, 1pm-2:30am ET | Grades finished games from ESPN (no odds credits) and republishes when anything changed |
 | `pages.yml` | Push to `web/` | Republishes the dashboard |
 
 - **Database:** Neon Postgres, schema `sportpredict` (`db/001_init.sql`).

@@ -240,7 +240,7 @@ function openTable(rows, { showPortfolio = true } = {}) {
 }
 
 function settledTable(rows, { showPortfolio = true } = {}) {
-  if (!rows.length) return `<tbody><tr><td class="muted">Nothing settled yet. Results post the morning after games.</td></tr></tbody>`;
+  if (!rows.length) return `<tbody><tr><td class="muted">Nothing settled yet. Results post within about 30 minutes of a game ending.</td></tr></tbody>`;
   return `<thead><tr>${showPortfolio ? "<th>Portfolio</th>" : ""}<th>Game</th><th>Bet</th><th class="num">Odds</th><th class="num">Final</th><th>Result</th><th class="num">Profit</th></tr></thead><tbody>` +
     rows.map((b) => `<tr>${showPortfolio ? `<td>${name(b.strategy)}</td>` : ""}
       <td>${esc(b.matchup)}<div class="muted">${day(b.commence_time)}</div></td>
