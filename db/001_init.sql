@@ -127,7 +127,8 @@ select b.id, b.strategy, b.strategy_version, g.league,
        b.price_american, round(b.ev, 4) as ev, round(b.clv, 4) as clv,
        b.result, b.profit_units,
        g.away_score, g.home_score,
-       p.details -> 'factors' as factors
+       p.details -> 'factors' as factors,
+       p.details ->> 'summary' as summary
 from bets b
 join games g on g.id = b.game_id
 left join predictions p on p.id = b.prediction_id;

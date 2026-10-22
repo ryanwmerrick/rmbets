@@ -20,53 +20,71 @@
 
   <main class="wrap">
     <section>
+      <div class="section-head"><h2>Today's bets</h2><span class="muted" id="today-count"></span></div>
+      <div class="rail" id="rail"></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Portfolios</h2><span class="muted">Tap one for details</span></div>
       <div class="cards" id="cards"></div>
     </section>
 
     <section>
       <h2>Profit over time</h2>
-      <div class="panel chart-panel"><canvas id="profit-chart" aria-label="Profit over time by portfolio"></canvas>
+      <div class="panel chart-panel"><canvas id="profit-chart" aria-label="Running profit by portfolio"></canvas>
         <p class="empty" id="chart-empty" hidden>Fills in once the first games finish.</p>
       </div>
     </section>
 
     <section>
-      <h2>Open bets</h2>
-      <div class="filters" id="today-filters" role="tablist"></div>
-      <div class="panel table-wrap"><table id="today"></table></div>
+      <div class="section-head"><h2>All open bets</h2><div class="filters" id="open-filters" role="tablist"></div></div>
+      <div class="panel table-wrap"><table id="open"></table></div>
+      <button class="more" id="open-more" hidden></button>
     </section>
 
     <section>
       <h2>AI's take on each game</h2>
       <div class="reads" id="reads"></div>
+      <button class="more" id="reads-more" hidden></button>
     </section>
 
     <section>
-      <h2>Results</h2>
-      <div class="panel table-wrap"><table id="recent"></table></div>
-    </section>
-
-    <section class="two-col">
-      <div>
-        <h2>Is the AI more accurate than the market?</h2>
-        <div class="panel table-wrap"><table id="brier"></table></div>
-      </div>
-      <div>
-        <h2>Recent runs</h2>
-        <div class="panel table-wrap"><table id="runs"></table></div>
-      </div>
+      <h2>Latest results</h2>
+      <div class="panel table-wrap"><table id="latest"></table></div>
+      <button class="more" id="latest-more" hidden></button>
     </section>
 
     <section>
       <h2>How it works</h2>
-      <div class="panel method">
-        <p><strong>Market EV</strong> bets when a sportsbook's price beats the sharp market's fair odds by 2.5% or more. No AI.</p>
-        <p><strong>AI analyst</strong> reads ESPN injuries, records and rest, nudges the market's odds, and bets when it sees a 3% edge.</p>
-        <p><strong>Favorite</strong> and <strong>Coin flip</strong> are control groups to compare against.</p>
-        <p><strong>CLV</strong> shows whether we got a better price than where the line closed. Positive CLV over time is the best sign of real skill.</p>
+      <div class="how">
+        <div class="how-grid">
+          <div class="how-card" style="--c:var(--c-ai_analyst)"><h3>AI analyst</h3><p>Reads today's injury reports, records and rest from ESPN, adjusts the market's odds by up to 5 points, and bets when it sees an edge of 3% or more.</p></div>
+          <div class="how-card" style="--c:var(--c-market_ev)"><h3>Market EV</h3><p>No AI. Compares every sportsbook to the sharpest market (Pinnacle) and bets prices that are at least 2.5% too generous.</p></div>
+          <div class="how-card" style="--c:var(--c-baseline_fav)"><h3>Favorite</h3><p>Control group. Always bets the favorite to win.</p></div>
+          <div class="how-card" style="--c:var(--c-baseline_random)"><h3>Coin flip</h3><p>Control group. Bets a random side. Any real strategy should beat this.</p></div>
+        </div>
+        <div class="panel">
+          <h3 class="mini-h">Every day</h3>
+          <ol class="steps">
+            <li><b>~10 AM ET</b><span>Grade last night's games, pull fresh odds, place new bets.</span></li>
+            <li><b>~5 PM ET</b><span>Check the odds again before tip-off to measure CLV.</span></li>
+            <li><b>Next morning</b><span>Results post and profits update.</span></li>
+          </ol>
+          <h3 class="mini-h">Terms</h3>
+          <dl class="terms">
+            <dt>Edge</dt><dd>How much better our price is than the fair odds.</dd>
+            <dt>ROI</dt><dd>Profit as a share of everything bet.</dd>
+            <dt>CLV</dt><dd>Did we beat the closing line? Positive CLV over time is the best sign of real skill.</dd>
+          </dl>
+        </div>
       </div>
     </section>
   </main>
+
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+  <aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+    <div class="sheet-inner" id="sheet-body"></div>
+  </aside>
 
   <footer class="wrap">Paper bets only. Odds: The Odds API. Stats: ESPN. AI: Gemini.</footer>
 </body>

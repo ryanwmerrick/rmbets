@@ -26,7 +26,11 @@ def build(conn) -> dict:
         "summary": q("select * from v_portfolio_summary order by strategy"),
         "daily_units": q("select * from v_daily_units order by day"),
         "today": q("select * from v_bets_detail where result = 'pending' order by commence_time, matchup, strategy"),
-        "recent": q("select * from v_bets_detail where result <> 'pending' order by commence_time desc, id desc limit 150"),
+        # Up to 200 settled bets per portfolio, newest first
+        "settled": q(
+            "select * from (select *, row_number() over (partition by strategy "
+            "order by commence_time desc, id desc) as rn from v_bets_detail where result <> 'pending') t "
+            "where rn <= 200 order by commence_time desc, id desc"),
         "ai_vs_market": q("select * from v_ai_vs_market"),
         "ai_reads": q(
             "select g.league, g.away || ' @ ' || g.home as matchup, g.home, g.commence_time, "
@@ -36,7 +40,6 @@ def build(conn) -> dict:
             "from predictions p join games g on g.id = p.game_id "
             "where p.strategy = 'ai_analyst' and p.outcome = g.home and not g.completed "
             "and g.commence_time > now() - interval '6 hours' order by g.commence_time"),
-        "runs": q("select * from v_runs_recent"),
     }
 
 
