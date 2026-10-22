@@ -44,8 +44,9 @@ class OddsAPI:
             commenceTimeTo=iso_z(end),
         )
 
-    def scores(self, sport_key: str, days_from: int = config.SCORES_DAYS_FROM) -> list[dict]:
-        return self._get(f"/sports/{sport_key}/scores", daysFrom=days_from, dateFormat="iso")
+    def events(self, sport_key: str, start: datetime, end: datetime) -> list[dict]:
+        """Games scheduled in the window (this endpoint costs no credits)."""
+        return self._get(f"/sports/{sport_key}/events", commenceTimeFrom=iso_z(start), commenceTimeTo=iso_z(end))
 
 
 def flatten_odds(event: dict) -> list[dict]:

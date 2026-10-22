@@ -8,12 +8,14 @@ old and new bets are never mixed in the results.
 LEAGUES = {
     "basketball_nba": "NBA",
     "icehockey_nhl": "NHL",
+    "americanfootball_nfl": "NFL",
 }
 
 # ESPN public API path per league (injuries, scoreboard)
 ESPN_PATHS = {
     "NBA": "basketball/nba",
     "NHL": "hockey/nhl",
+    "NFL": "football/nfl",
 }
 
 # Pinnacle is the sharp reference line. Up to 10 books in one request cost the
@@ -56,8 +58,7 @@ GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite"
 GEMINI_SECONDS_BETWEEN_CALLS = 7   # stay under free-tier requests-per-minute
 GEMINI_TIMEOUT_SECONDS = 60
 GEMINI_MAX_ROUNDS = 3              # rounds through the model list per game
-AI_TIME_BUDGET_SECONDS = 25 * 60   # stop calling the AI after this; other strategies still run
+AI_TIME_BUDGET_SECONDS = 35 * 60   # stop calling the AI after this; other strategies still run
 
 # Bets on games that never complete within this many days are voided
 VOID_AFTER_DAYS = 4
-SCORES_DAYS_FROM = 3

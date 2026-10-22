@@ -18,7 +18,7 @@ def main() -> None:
     ai = AIAnalyst()
     with db.run_log(conn, "daily") as state:
         notes = state["notes"]
-        notes["grading"] = grade.run(conn, api)
+        notes["grading"] = grade.run(conn)
 
         now = datetime.now(timezone.utc)
         today_et = now.astimezone(ZoneInfo("America/New_York")).date()
@@ -29,7 +29,13 @@ def main() -> None:
             if sport_key not in active:
                 print(f"[skip] {league} is out of season")
                 continue
-            events = api.odds(sport_key, config.MORNING_MARKETS, now, now + timedelta(hours=config.LOOKAHEAD_HOURS))
+            end = now + timedelta(hours=config.LOOKAHEAD_HOURS)
+            # Free check first, so odds credits are only spent on days the league plays
+            if not api.events(sport_key, now, end):
+                notes["games"][league] = 0
+                print(f"[skip] no {league} games today")
+                continue
+            events = api.odds(sport_key, config.MORNING_MARKETS, now, end)
             notes["games"][league] = len(events)
             print(f"{league}: {len(events)} games")
             if not events:

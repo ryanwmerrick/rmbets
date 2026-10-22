@@ -1,10 +1,12 @@
-"""Pull final scores (matched by The Odds API game id) and grade pending bets."""
+"""Pull final scores from ESPN's free scoreboard and grade pending bets."""
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
-from . import config
+from . import config, espn
 from .fair import profit_units
 
-API_KEY_FOR = {league: key for key, league in config.LEAGUES.items()}
+ET = ZoneInfo("America/New_York")
 
 
 def grade_bet(market: str, outcome: str, point, home: str, away: str, hs: int, as_: int) -> str:
@@ -24,21 +26,44 @@ def grade_bet(market: str, outcome: str, point, home: str, away: str, hs: int, a
     return "win" if margin > 0 else "loss" if margin < 0 else "push"
 
 
-def update_scores(conn, api) -> int:
-    leagues = [r["league"] for r in conn.execute(
-        "select distinct league from games where not completed and commence_time < now()").fetchall()]
+def match_final(home: str, away: str, board: list[dict]) -> tuple[int, int] | None:
+    """Final (home_score, away_score) for our game from an ESPN scoreboard, matched by team nicknames.
+
+    Matches regardless of which side ESPN lists as home (neutral-site games), and
+    returns scores in our home/away order. None if the game isn't final yet.
+    """
+    hk, ak = espn.team_key(home), espn.team_key(away)
+    for g in board:
+        if not g["completed"]:
+            continue
+        scores = {espn.team_key(side["name"]): side["score"] for side in espn.sides(g)}
+        if set(scores) == {hk, ak} and None not in scores.values():
+            return scores[hk], scores[ak]
+    return None
+
+
+def update_scores(conn) -> int:
+    pending = conn.execute(
+        "select id, league, home, away, commence_time from games where not completed "
+        "and commence_time < now() and commence_time > now() - make_interval(days => %s)",
+        (config.VOID_AFTER_DAYS + 1,),
+    ).fetchall()
+    boards: dict[tuple, list[dict]] = {}
+    by_day = defaultdict(list)
+    for g in pending:
+        by_day[(g["league"], g["commence_time"].astimezone(ET).date())].append(g)
     updated = 0
-    for league in leagues:
-        for g in api.scores(API_KEY_FOR[league]):
-            if not g.get("completed") or not g.get("scores"):
-                continue
-            scores = {s["name"]: int(s["score"]) for s in g["scores"]}
-            cur = conn.execute(
-                "update games set home_score = %s, away_score = %s, completed = true, updated_at = now() "
-                "where id = %s and not completed",
-                (scores.get(g["home_team"]), scores.get(g["away_team"]), g["id"]),
-            )
-            updated += cur.rowcount
+    for (league, day), games in by_day.items():
+        if (league, day) not in boards:
+            boards[(league, day)] = espn.scoreboard(league, day)
+        for g in games:
+            final = match_final(g["home"], g["away"], boards[(league, day)])
+            if final:
+                conn.execute(
+                    "update games set home_score = %s, away_score = %s, completed = true, updated_at = now() "
+                    "where id = %s", (final[0], final[1], g["id"]),
+                )
+                updated += 1
     conn.commit()
     return updated
 
@@ -68,5 +93,5 @@ def grade_pending(conn) -> dict:
     return counts
 
 
-def run(conn, api) -> dict:
-    return {"games_completed": update_scores(conn, api), "graded": grade_pending(conn)}
+def run(conn) -> dict:
+    return {"games_completed": update_scores(conn), "graded": grade_pending(conn)}

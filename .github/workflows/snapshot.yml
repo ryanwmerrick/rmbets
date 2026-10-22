@@ -3,6 +3,7 @@ name: Evening snapshot
 on:
   schedule:
     - cron: "30 21 * * *"   # 4:30-5:30pm ET, ahead of 7pm starts even if GitHub runs late
+    - cron: "15 16 * * 0"   # Sundays ~11am-12pm ET, after the daily run and before 1pm NFL kickoffs
   workflow_dispatch:
 
 permissions:

@@ -1,6 +1,6 @@
 # sportPredictLLM v2
 
-A paper-betting experiment on NBA and NHL games. It asks one question: **does an AI analyst add anything beyond what the betting market already knows?**
+A paper-betting experiment on NBA, NHL and NFL games. It asks one question: **does an AI analyst add anything beyond what the betting market already knows?**
 
 Four portfolios bet the same games at the same flat stake (shown as $10 on the dashboard), always using real prices from The Odds API:
 
@@ -17,8 +17,8 @@ Results are scored on ROI, closing line value (CLV), and for the AI, a Brier sco
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `daily.yml` | 15:00 UTC | Grades finished games, snapshots odds, runs every portfolio, publishes the dashboard |
-| `snapshot.yml` | 21:30 UTC | Moneyline snapshot near game time for CLV, then publishes the dashboard |
+| `daily.yml` | 15:00 UTC | Grades finished games from ESPN's scoreboard, snapshots odds for leagues playing that day, runs every portfolio, publishes the dashboard |
+| `snapshot.yml` | 21:30 UTC daily, 16:15 UTC Sundays | Moneyline snapshot near game time for CLV, then publishes the dashboard |
 | `pages.yml` | Push to `web/` | Republishes the dashboard |
 
 - **Database:** Neon Postgres, schema `sportpredict` (`db/001_init.sql`).
@@ -30,9 +30,13 @@ Results are scored on ROI, closing line value (CLV), and for the AI, a Brier sco
 ```bash
 pip install -r requirements.txt
 pytest -q tests
-python -m sportpredict.jobs.daily      # uses ~6-12 Odds API credits
+python -m sportpredict.jobs.daily      # ~3 Odds API credits per league with games that day
 python -m sportpredict.jobs.export site/data.json && cp web/* site/ && python -m http.server -d site
 ```
+
+## Odds API credits
+
+The free tier gives 500 credits a month. Grading uses ESPN (free), and a free events check skips leagues with no games, so odds are only bought on game days: about 3 credits per league per game day, plus 1 per league for each CLV snapshot. NBA + NHL + NFL comes to roughly 300 a month.
 
 ## Rules
 
