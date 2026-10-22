@@ -1,6 +1,6 @@
 -- sportPredictLLM v2 schema (Neon Postgres).
 -- Everything lives in the `sportpredict` schema; v1's `public.pick` table is
--- left untouched and exposed read-only through the `v1_picks` view.
+-- left untouched.
 
 create schema if not exists sportpredict;
 set search_path = sportpredict;
@@ -89,8 +89,7 @@ create table if not exists runs (
   error             text
 );
 
-create or replace view v1_picks as
-select * from public.pick;
+drop view if exists v1_picks;
 
 
 -- Dashboard views (exported to JSON by the jobs).

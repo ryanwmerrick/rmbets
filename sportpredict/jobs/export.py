@@ -19,26 +19,6 @@ def _json(v):
     raise TypeError(type(v))
 
 
-def v1_summary(conn) -> dict:
-    rows = conn.execute("select version, odds, result from v1_picks where result in ('WIN', 'LOSS')").fetchall()
-    out = {"bets": 0, "wins": 0, "units": 0.0}
-    for r in rows:
-        try:
-            o = float(r["odds"])
-        except (TypeError, ValueError):
-            continue
-        out["bets"] += 1
-        if r["result"] == "WIN":
-            out["wins"] += 1
-            out["units"] += o / 100 if o > 0 else 100 / abs(o)
-        else:
-            out["units"] -= 1
-    out["units"] = round(out["units"], 2)
-    out["roi"] = round(out["units"] / out["bets"], 4) if out["bets"] else None
-    out["period"] = "Nov 24, 2025 - Jan 10, 2026"
-    return out
-
-
 def build(conn) -> dict:
     q = lambda sql: conn.execute(sql).fetchall()  # noqa: E731
     return {
@@ -57,7 +37,6 @@ def build(conn) -> dict:
             "where p.strategy = 'ai_analyst' and p.outcome = g.home and not g.completed "
             "and g.commence_time > now() - interval '6 hours' order by g.commence_time"),
         "runs": q("select * from v_runs_recent"),
-        "v1": v1_summary(conn),
     }
 
 
