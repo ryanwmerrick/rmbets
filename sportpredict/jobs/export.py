@@ -8,7 +8,9 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from .. import db
+from zoneinfo import ZoneInfo
+
+from .. import config, db, espn
 
 
 def _json(v):
@@ -43,10 +45,24 @@ def build(conn) -> dict:
     }
 
 
+def team_info(leagues: set[str]) -> dict:
+    """Logos and records for the dashboard. Cosmetic, so an ESPN outage only drops logos."""
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    out = {}
+    for league in sorted(leagues):
+        try:
+            out[league] = espn.teams(league, today)
+        except Exception as e:
+            print(f"[warn] ESPN team info for {league} unavailable: {e}")
+    return out
+
+
 def main() -> None:
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "site/data.json")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(build(db.connect()), default=_json, indent=1))
+    data = build(db.connect())
+    data["teams"] = team_info({r["league"] for r in data["today"] + data["ai_reads"]} or set(config.LEAGUES.values()))
+    out.write_text(json.dumps(data, default=_json, indent=1))
     print(f"wrote {out}")
 
 

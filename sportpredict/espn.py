@@ -58,6 +58,28 @@ def scoreboard(league: str, day: date) -> list[dict]:
     return games
 
 
+def teams(league: str, today: date) -> dict[str, dict]:
+    """Display info per team for the dashboard: short name, abbreviation, logos, today's record."""
+    data = _get(f"{config.ESPN_PATHS[league]}/teams")
+    records = {}
+    for g in scoreboard(league, today):
+        for side in g.values():
+            records[team_key(side["name"])] = side["record"]
+    out = {}
+    for entry in data["sports"][0]["leagues"][0]["teams"]:
+        t = entry["team"]
+        logos = {tuple(l.get("rel", [])): l["href"] for l in t.get("logos", [])}
+        key = team_key(t["displayName"])
+        out[key] = {
+            "abbr": t["abbreviation"],
+            "short": t.get("shortDisplayName") or t["displayName"],
+            "logo": logos.get(("full", "default")),
+            "logo_dark": logos.get(("full", "dark")),
+            "record": records.get(key),
+        }
+    return out
+
+
 def league_context(league: str, today: date) -> dict:
     """Everything the AI analyst gets for one league, fetched once per run."""
     records = {}

@@ -61,26 +61,45 @@ section { margin-top: 32px; min-width: 0; }
 .neg { color: var(--bad); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 6px; flex: none; }
 
-/* Today's bets rail */
+/* Today's bets: scoreboard cards */
 .rail { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 12px; margin: 0 -2px; scrollbar-width: thin; }
-.bet { flex: 0 0 260px; scroll-snap-align: start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden; }
-.bet::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--c); }
-.bet .who { display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--c); text-transform: uppercase; letter-spacing: 0.05em; }
-.bet .pick { font-size: 17px; font-weight: 700; line-height: 1.25; }
-.bet .game { font-size: 13px; color: var(--muted); }
-.bet .why { font-size: 12.5px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.bet .nums { display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
-.bet .nums span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .rail .none { color: var(--muted); padding: 16px; }
+.game { flex: 0 0 250px; height: 212px; scroll-snap-align: start; perspective: 1000px; cursor: pointer; outline: none; }
+.game:focus-visible .face { outline: 2px solid var(--c); outline-offset: 2px; }
+.flip { position: relative; width: 100%; height: 100%; transition: transform 0.45s ease; transform-style: preserve-3d; }
+.game.flipped .flip { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+.back { transform: rotateY(180deg); }
+.g-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--chip); font-size: 11.5px; color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
+.g-top .who { color: var(--c); text-transform: uppercase; letter-spacing: 0.06em; }
+.teams { padding: 6px 8px 0; display: flex; flex-direction: column; gap: 2px; flex: 1; justify-content: center; }
+.team { display: flex; align-items: center; gap: 10px; padding: 6px 6px; border-radius: 10px; }
+.team.picked { background: color-mix(in srgb, var(--c) 14%, transparent); }
+.team .logo, .team .logo img { width: 32px; height: 32px; flex: none; display: block; object-fit: contain; }
+.logo.fallback { width: 32px; height: 32px; border-radius: 50%; background: var(--chip); display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+.tn { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.tn b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tn span { font-size: 11.5px; color: var(--muted); }
+.team:not(.picked) .tn b { font-weight: 600; color: var(--muted); }
+.pick-tag { margin-left: auto; background: var(--c); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
+.total-line { margin: 0 14px; font-size: 13px; font-weight: 700; color: var(--c); }
+.g-bottom { display: grid; grid-template-columns: repeat(3, 1fr) auto; align-items: end; gap: 6px; padding: 8px 12px 10px; margin-top: 6px; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.g-bottom span { display: block; color: var(--muted); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.flip-hint { color: var(--muted); font-size: 15px; align-self: center; }
+.why { padding: 10px 14px 12px; overflow-y: auto; font-size: 13px; }
+.why p { margin: 8px 0 0; color: var(--muted); line-height: 1.45; }
+.prob-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.probline { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.probline b { color: var(--ink); font-size: 16px; margin-left: 4px; }
+@media (prefers-reduced-motion: reduce) { .flip { transition: none; } }
 
 /* Portfolio cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .card { all: unset; box-sizing: border-box; cursor: pointer; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; border-top: 4px solid var(--c); box-shadow: var(--shadow); display: block; transition: transform 0.12s ease, border-color 0.12s ease; }
 .card:hover { transform: translateY(-2px); border-color: var(--c); }
 .card:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
-.card h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; }
+.card h3 { margin: 0 0 6px; font-size: 15px; display: flex; justify-content: space-between; }
 .card h3 .go { color: var(--muted); font-weight: 400; }
-.card .desc { color: var(--muted); font-size: 13px; margin: 2px 0 10px; min-height: 3em; }
 .card .big, .sheet .big { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; font-size: 13px; }
 .stats div span { display: block; color: var(--muted); font-size: 12px; }
@@ -160,10 +179,9 @@ footer.wrap { color: var(--muted); font-size: 12px; padding-top: 32px; padding-b
   h1 { font-size: 24px; }
   .how-grid { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
-  .bet { flex-basis: 78%; }
+  .game { flex-basis: 78%; }
   .cards { grid-template-columns: 1fr 1fr; gap: 10px; }
   .card { padding: 12px; }
-  .card .desc { display: none; }
   .card .big { font-size: 21px; margin-top: 6px; }
   .card .stats { grid-template-columns: 1fr 1fr; font-size: 12px; }
   .card .stats div:nth-child(3) { display: none; }

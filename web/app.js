@@ -73,28 +73,81 @@ function collapsible({ button, total, limit, noun, draw, label }) {
 
 let DATA = null;
 
-// ---------- Today's bets rail ----------
+// ---------- Today's bets: scoreboard cards that flip to show the reasoning ----------
+const teamKey = (n) => n.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, "").trim().split(/\s+/).pop();
+const teamInfo = (league, n) => DATA.teams?.[league]?.[teamKey(n)] ?? { abbr: n.slice(0, 3).toUpperCase(), short: n };
+const toAmerican = (dec) => (dec >= 2 ? `+${Math.round((dec - 1) * 100)}` : `${Math.round(-100 / (dec - 1))}`);
+
+function logo(t) {
+  if (!t.logo) return `<span class="logo fallback">${esc(t.abbr)}</span>`;
+  return `<picture class="logo"><source media="(prefers-color-scheme: dark)" srcset="${esc(t.logo_dark || t.logo)}"><img src="${esc(t.logo)}" alt="" loading="lazy"></picture>`;
+}
+
+function teamRow(b, teamName) {
+  const t = teamInfo(b.league, teamName);
+  const picked = b.market !== "totals" && b.outcome === teamName;
+  const tag = !picked ? "" : b.market === "spreads" ? `${b.point > 0 ? "+" : ""}${b.point}` : "Pick";
+  return `<div class="team${picked ? " picked" : ""}">${logo(t)}
+    <div class="tn"><b>${esc(t.short)}</b>${t.record ? `<span>${esc(t.record)}</span>` : ""}</div>
+    ${tag ? `<span class="pick-tag">${tag}</span>` : ""}
+  </div>`;
+}
+
+function reasonFor(b) {
+  const dec = 1 + winUnits(b.price_american);
+  const fairProb = (1 + b.ev) / dec;
+  if (b.strategy === "ai_analyst") {
+    const read = DATA.ai_reads.find((r) => r.home === b.home && r.matchup === b.matchup);
+    const aiProb = read ? (b.outcome === b.home ? read.ai_prob : 1 - read.ai_prob) : fairProb;
+    const mkt = read ? (b.outcome === b.home ? read.market_prob : 1 - read.market_prob) : null;
+    return `<div class="prob-label">${esc(teamInfo(b.league, b.outcome).short)} win chance</div>
+      <div class="probline"><span>AI <b>${plainPct(aiProb)}</b></span><span>Market <b>${plainPct(mkt)}</b></span></div>
+      <p>${esc(b.summary || "No reasoning stored.")}</p>`;
+  }
+  return `<div class="prob-label">Price on ${esc(teamInfo(b.league, b.outcome).short)}</div>
+    <div class="probline"><span>Fair <b>${toAmerican(1 / fairProb)}</b></span><span>${esc(book(b.book))} <b>${odds(b.price_american)}</b></span></div>
+    <p>Pinnacle's odds, with the bookmaker's margin removed, put a fair price at ${toAmerican(1 / fairProb)}. ${esc(book(b.book))} pays ${odds(b.price_american)}, about ${(b.ev * 100).toFixed(1)}% more than it should over the long run.</p>`;
+}
+
+function gameCard(b) {
+  const pickLine = b.market === "totals" ? `<div class="total-line">${esc(b.outcome)} ${b.point} total</div>` : "";
+  return `<article class="game" style="--c:var(--c-${b.strategy})" tabindex="0" role="button" aria-pressed="false" aria-label="${esc(pick(b).replace(/<[^>]+>/g, ""))}. Tap to see why.">
+    <div class="flip">
+      <div class="face front">
+        <div class="g-top"><span class="who">${STRATEGIES[b.strategy].label}</span><span>${b.league} · ${et(b.commence_time)}</span></div>
+        <div class="teams">${teamRow(b, b.away)}${teamRow(b, b.home)}</div>
+        ${pickLine}
+        <div class="g-bottom">
+          <div><span>Odds</span>${odds(b.price_american)}</div>
+          <div><span>To win</span>${usd(winUnits(b.price_american), false)}</div>
+          <div><span>Edge</span><b class="pos">${pct(b.ev)}</b></div>
+          <span class="flip-hint" aria-hidden="true">↻</span>
+        </div>
+      </div>
+      <div class="face back">
+        <div class="g-top"><span class="who">Why this bet</span><span aria-hidden="true">↺</span></div>
+        <div class="why">${reasonFor(b)}</div>
+      </div>
+    </div>
+  </article>`;
+}
+
 function renderRail(today) {
-  const bets = RAIL_ORDER.flatMap((s) => today.filter((b) => b.strategy === s));
-  $("today-count").textContent = bets.length ? `${bets.length} bet${bets.length === 1 ? "" : "s"} · scroll for more` : "";
+  const bets = RAIL_ORDER.flatMap((s) => today.filter((b) => b.strategy === s).sort((x, y) => x.commence_time.localeCompare(y.commence_time)));
+  $("today-count").textContent = bets.length ? "Tap a card to see why" : "";
   if (!bets.length) {
     $("rail").innerHTML = `<div class="none">No AI or Market EV bets today. They only bet when they find an edge.</div>`;
     return;
   }
-  $("rail").innerHTML = bets.map((b) => {
-    const why = b.strategy === "ai_analyst" && b.summary ? b.summary : `${esc(book(b.book))} pays more than the fair odds.`;
-    return `<article class="bet" style="--c:var(--c-${b.strategy})">
-      <div class="who">${dot(b.strategy)}${STRATEGIES[b.strategy].label}</div>
-      <div class="pick">${pick(b)}</div>
-      <div class="game">${esc(b.matchup)} · ${et(b.commence_time)}</div>
-      <div class="why">${esc(why)}</div>
-      <div class="nums">
-        <div><span>Odds</span>${odds(b.price_american)}</div>
-        <div><span>To win</span>${usd(winUnits(b.price_american), false)}</div>
-        <div><span>Edge</span><b class="pos">${pct(b.ev)}</b></div>
-      </div>
-    </article>`;
-  }).join("");
+  $("rail").innerHTML = bets.map(gameCard).join("");
+  $("rail").querySelectorAll(".game").forEach((card) => {
+    const flip = () => {
+      const on = card.classList.toggle("flipped");
+      card.setAttribute("aria-pressed", String(on));
+    };
+    card.addEventListener("click", flip);
+    card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } });
+  });
 }
 
 // ---------- Portfolio cards ----------
@@ -108,7 +161,6 @@ function renderCards() {
     const settled = (r.decided ?? 0) + (r.pushes ?? 0);
     return `<button class="card" style="--c:var(--c-${s})" data-s="${s}" aria-label="Open ${STRATEGIES[s].label} details">
       <h3>${STRATEGIES[s].label}<span class="go">›</span></h3>
-      <p class="desc">${STRATEGIES[s].desc}</p>
       <div class="big ${cls(r.units)}">${usd(r.units ?? 0)}</div>
       <div class="stats">
         <div><span>Record</span>${r.wins ?? 0}-${r.losses ?? 0}</div>
