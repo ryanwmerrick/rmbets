@@ -1,6 +1,6 @@
 // Every bet is one flat stake. The database stores results in stakes ("units");
 // the page shows them as dollars at this bet size.
-const STAKE = 100;
+const STAKE = 10;
 
 const STRATEGIES = {
   market_ev: { label: "Market EV", desc: "Bets sportsbook prices that beat the sharp market. No AI." },
@@ -20,8 +20,8 @@ const odds = (p) => (p > 0 ? `+${p}` : `${p}`);
 const usd = (units, sign = true) => {
   if (units == null) return "–";
   const v = units * STAKE;
-  const s = `$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  return !sign || Math.abs(v) < 0.5 ? s : `${v > 0 ? "+" : "−"}${s}`;
+  const s = `$${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return !sign || Math.abs(v) < 0.005 ? s : `${v > 0 ? "+" : "−"}${s}`;
 };
 const et = (iso, opts = { weekday: "short", hour: "numeric", minute: "2-digit" }) =>
   new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", ...opts });

@@ -2,7 +2,7 @@
 
 A paper-betting experiment on NBA and NHL games. It asks one question: **does an AI analyst add anything beyond what the betting market already knows?**
 
-Four portfolios bet the same games at the same flat stake (shown as $100 on the dashboard), always using real prices from The Odds API:
+Four portfolios bet the same games at the same flat stake (shown as $10 on the dashboard), always using real prices from The Odds API:
 
 | Portfolio | What it does |
 | --- | --- |
