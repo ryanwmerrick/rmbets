@@ -3,19 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>sportPredict</title>
+  <title>RMBets</title>
   <meta name="description" content="Paper bets on NBA, NHL and NFL: does an AI analyst beat the betting market?">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232b59c3'/%3E%3Cpath d='M7 22l6-6 4 3 8-8' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 11h6v6' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="wrap">
-    <div>
-      <h1>sportPredict</h1>
-      <p class="sub">Can an AI beat the betting market? NBA, NHL and NFL, <span id="stake-note">$10 paper bets</span>.</p>
+  <header class="wrap top">
+    <div class="top-row">
+      <a class="brand" href="./" aria-label="RMBets home">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" />
+          <path d="M7 22l6-6 4 3 8-8" />
+          <path d="M19 11h6v6" />
+        </svg>
+        <span class="word"><b>RM</b><span>Bets</span></span>
+      </a>
+      <p class="updated" id="updated">Loading…</p>
     </div>
-    <p class="updated" id="updated">Loading…</p>
+    <p class="tagline">Can an AI beat the betting market?
+      <span class="chips"><span class="chip">NBA</span><span class="chip">NHL</span><span class="chip">NFL</span><span class="chip" id="stake-note">$10 paper bets</span></span>
+    </p>
   </header>
 
   <main class="wrap">
@@ -43,8 +53,8 @@
     </section>
 
     <section>
-      <h2>AI's take on each game</h2>
-      <div class="reads" id="reads"></div>
+      <div class="section-head"><h2>AI's take on each game</h2><span class="muted">Market → AI win chance for the home team. Tap for why.</span></div>
+      <ul class="reads panel" id="reads"></ul>
       <button class="more" id="reads-more" hidden></button>
     </section>
 
@@ -89,6 +99,6 @@
     <div class="sheet-inner" id="sheet-body"></div>
   </aside>
 
-  <footer class="wrap">Paper bets only. Odds: The Odds API. Stats: ESPN. AI: Gemini.</footer>
+  <footer class="wrap">RMBets · Paper bets only. Odds: The Odds API. Stats: ESPN. AI: Gemini.</footer>
 </body>
 </html>

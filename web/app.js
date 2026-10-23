@@ -54,10 +54,18 @@ const dot = (s) => `<span class="dot" style="--c:var(--c-${s})"></span>`;
 const name = (s) => `${dot(s)}${STRATEGIES[s]?.label ?? esc(s)}`;
 
 function pick(b) {
-  if (b.market === "h2h") return `${esc(b.outcome)} to win`;
-  if (b.market === "spreads") return `${esc(b.outcome)} ${b.point > 0 ? "+" : ""}${b.point}`;
+  const team = esc(teamInfo(b.league, b.outcome).short);
+  if (b.market === "h2h") return `${team} win`;
+  if (b.market === "spreads") return `${team} ${b.point > 0 ? "+" : ""}${b.point}`;
   return `${esc(b.outcome)} ${b.point}`;
 }
+
+// Small "[logo] SJS @ [logo] OTT" used in tables and lists
+const mini = (league, teamName) => {
+  const t = teamInfo(league, teamName);
+  return `<span class="mini">${logo(t)}<b>${esc(t.abbr)}</b></span>`;
+};
+const matchupMini = (league, away, home) => `<span class="matchup">${mini(league, away)}<span class="at">@</span>${mini(league, home)}</span>`;
 
 // Show `limit` rows/cards until the button is pressed.
 function collapsible({ button, total, limit, noun, draw, label }) {
@@ -232,7 +240,7 @@ function openTable(rows, { showPortfolio = true } = {}) {
   if (!rows.length) return `<tbody><tr><td class="muted">No open bets.</td></tr></tbody>`;
   return `<thead><tr>${showPortfolio ? "<th>Portfolio</th>" : ""}<th>Game</th><th>Bet</th><th class="num">Odds</th><th class="num">To win</th><th class="num">CLV</th></tr></thead><tbody>` +
     rows.map((b) => `<tr>${showPortfolio ? `<td>${name(b.strategy)}</td>` : ""}
-      <td>${esc(b.matchup)}<div class="muted">${b.league} · ${et(b.commence_time)}</div></td>
+      <td>${matchupMini(b.league, b.away, b.home)}<div class="muted">${b.league} · ${et(b.commence_time)}</div></td>
       <td>${pick(b)}</td>
       <td class="num">${odds(b.price_american)}<div class="muted">${esc(book(b.book))}</div></td>
       <td class="num">${usd(winUnits(b.price_american), false)}</td>
@@ -243,7 +251,7 @@ function settledTable(rows, { showPortfolio = true } = {}) {
   if (!rows.length) return `<tbody><tr><td class="muted">Nothing settled yet. Results post within about 30 minutes of a game ending.</td></tr></tbody>`;
   return `<thead><tr>${showPortfolio ? "<th>Portfolio</th>" : ""}<th>Game</th><th>Bet</th><th class="num">Odds</th><th class="num">Final</th><th>Result</th><th class="num">Profit</th></tr></thead><tbody>` +
     rows.map((b) => `<tr>${showPortfolio ? `<td>${name(b.strategy)}</td>` : ""}
-      <td>${esc(b.matchup)}<div class="muted">${day(b.commence_time)}</div></td>
+      <td>${matchupMini(b.league, b.away, b.home)}<div class="muted">${b.league} · ${day(b.commence_time)}</div></td>
       <td>${pick(b)}</td><td class="num">${odds(b.price_american)}</td>
       <td class="num">${b.away_score ?? "–"}-${b.home_score ?? "–"}</td>
       <td><span class="pill ${b.result}">${b.result}</span></td>
@@ -269,27 +277,47 @@ function renderLatest(rows) {
 }
 
 // ---------- AI reads ----------
-function readCard(r) {
-  const raw = r.ai_prob - r.market_prob;
-  const delta = Math.abs(raw) < 0.005 ? 0 : raw;
-  const pts = Math.abs(delta * 100).toFixed(0);
-  const verdict = delta === 0 ? "Agrees with the market" : `${delta > 0 ? "Likes" : "Fades"} ${esc(r.home)} by ${pts} ${pts === "1" ? "pt" : "pts"}`;
-  return `<article class="read">
-    <div class="read-head"><h3>${esc(r.matchup)}</h3><span class="muted">${et(r.commence_time)}</span></div>
-    <div class="probs"><span>${esc(r.home)}: AI <b>${plainPct(r.ai_prob)}</b> · market ${plainPct(r.market_prob)}</span><b class="${cls(delta)}">${verdict}</b></div>
-    <div class="bar"><span class="m" style="left:${r.market_prob * 100}%"></span><span class="a" style="left:${r.ai_prob * 100}%"></span></div>
-    <p>${esc(r.summary)}</p>
-  </article>`;
+function readRow(r) {
+  const away = r.matchup.split(" @ ")[0];
+  const h = teamInfo(r.league, r.home);
+  // Compare the rounded numbers shown, so "34% → 34%" always reads as agreeing
+  const delta = Math.round(r.ai_prob * 100) - Math.round(r.market_prob * 100);
+  const verdict = delta === 0
+    ? `<span class="verdict">Agrees</span>`
+    : `<span class="verdict ${cls(delta)}" title="${esc(h.short)} win chance: market ${plainPct(r.market_prob)}, AI ${plainPct(r.ai_prob)}">${esc(h.abbr)} ${plainPct(r.market_prob)} → ${plainPct(r.ai_prob)}</span>`;
+  return `<li class="read">
+    <button class="read-row" aria-expanded="false">
+      ${matchupMini(r.league, away, r.home)}
+      <span class="read-time">${et(r.commence_time)}</span>
+      ${verdict}
+      <span class="chev" aria-hidden="true">›</span>
+    </button>
+    <div class="read-detail" hidden>
+      <div class="probs"><span>${esc(h.short)} win chance</span><span>AI <b>${plainPct(r.ai_prob)}</b> · Market <b>${plainPct(r.market_prob)}</b></span></div>
+      <div class="bar"><span class="m" style="left:${r.market_prob * 100}%"></span><span class="a" style="left:${r.ai_prob * 100}%"></span></div>
+      <p>${esc(r.summary)}</p>
+    </div>
+  </li>`;
 }
 
 function renderReads(reads) {
   // Games where the AI disagrees with the market come first
   const sorted = [...reads].sort((a, b) => Math.abs(b.ai_prob - b.market_prob) - Math.abs(a.ai_prob - a.market_prob));
   if (!sorted.length) {
-    $("reads").innerHTML = `<p class="muted">No upcoming games yet.</p>`;
+    $("reads").innerHTML = `<li class="muted empty-row">No upcoming games yet.</li>`;
     return;
   }
-  collapsible({ button: $("reads-more"), total: sorted.length, limit: 3, noun: "games", draw: (n) => { $("reads").innerHTML = sorted.slice(0, n).map(readCard).join(""); } });
+  collapsible({
+    button: $("reads-more"), total: sorted.length, limit: 5, noun: "games",
+    draw: (n) => {
+      $("reads").innerHTML = sorted.slice(0, n).map(readRow).join("");
+      $("reads").querySelectorAll(".read-row").forEach((btn) => btn.addEventListener("click", () => {
+        const open = btn.getAttribute("aria-expanded") !== "true";
+        btn.setAttribute("aria-expanded", String(open));
+        btn.nextElementSibling.hidden = !open;
+      }));
+    },
+  });
 }
 
 // ---------- Portfolio detail sheet ----------

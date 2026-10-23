@@ -1,4 +1,4 @@
-# sportPredictLLM v2
+# RMBets (sportPredictLLM v2)
 
 A paper-betting experiment on NBA, NHL and NFL games. It asks one question: **does an AI analyst add anything beyond what the betting market already knows?**
 
