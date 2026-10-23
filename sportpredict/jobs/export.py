@@ -34,6 +34,9 @@ def build(conn) -> dict:
             "order by commence_time desc, id desc) as rn from v_bets_detail where result <> 'pending') t "
             "where rn <= 200 order by commence_time desc, id desc"),
         "ai_vs_market": q("select * from v_ai_vs_market"),
+        # Public job status: last run time and ok/failed only (no error text or credits)
+        "status": q("select distinct on (job) job, status, coalesce(finished_at, started_at) as at "
+                    "from runs order by job, started_at desc"),
         "ai_reads": q(
             "select g.league, g.away || ' @ ' || g.home as matchup, g.home, g.commence_time, "
             "round(p.prob, 4) as ai_prob, round(p.fair_prob, 4) as market_prob, "

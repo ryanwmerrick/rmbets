@@ -2,7 +2,7 @@ name: Daily picks
 
 on:
   schedule:
-    - cron: "0 15 * * *"   # 10-11am ET: grade, snapshot odds, make picks
+    - cron: "0 14 * * *"   # 10am EDT / 9am EST: grade, snapshot odds, make picks
   workflow_dispatch:
 
 permissions:

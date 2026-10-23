@@ -153,7 +153,7 @@ function renderRail(today) {
   const bets = RAIL_ORDER.flatMap((s) => today.filter((b) => b.strategy === s).sort((x, y) => x.commence_time.localeCompare(y.commence_time)));
   $("today-count").textContent = bets.length ? "Tap a card to see why" : "";
   if (!bets.length) {
-    $("rail").innerHTML = `<div class="none">No AI or Market EV bets today. They only bet when they find an edge.</div>`;
+    $("rail").innerHTML = `<div class="none">No AI or Market EV bets yet today. Picks post around 10 AM ET, and these two only bet when they find an edge.</div>`;
     return;
   }
   $("rail").innerHTML = bets.map(gameCard).join("");
@@ -399,6 +399,28 @@ function route() {
   else hideSheet();
 }
 
+// ---------- Status line: when each job last ran ----------
+const DAILY_UTC_HOUR = 14;  // keep in sync with .github/workflows/daily.yml
+
+function renderStatus(rows) {
+  const by = Object.fromEntries((rows || []).map((r) => [r.job, r]));
+  // The morning job grades too, so "Results" is whichever checked most recently
+  const results = [by.grade, by.daily].filter(Boolean).sort((a, b) => b.at.localeCompare(a.at))[0];
+  const when = (iso) => et(iso, { weekday: "short", hour: "numeric", minute: "2-digit" });
+  const item = (label, r) => r
+    ? `<span class="st"><span class="st-dot ${r.status}"></span>${label} ${when(r.at)}</span>`
+    : `<span class="st"><span class="st-dot"></span>${label} –</span>`;
+  const next = new Date();
+  next.setUTCHours(DAILY_UTC_HOUR, 0, 0, 0);
+  if (next <= new Date()) next.setUTCDate(next.getUTCDate() + 1);
+  $("status").innerHTML = [
+    item("Picks", by.daily),
+    item("Odds check", by.snapshot),
+    item("Results", results),
+    `<span class="st muted">Next picks ${when(next.toISOString())}</span>`,
+  ].join("");
+}
+
 async function main() {
   $("stake-note").textContent = `$${STAKE} paper bets`;
   try {
@@ -409,6 +431,7 @@ async function main() {
     return;
   }
   $("updated").textContent = `Updated ${et(DATA.generated_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ET`;
+  renderStatus(DATA.status);
   renderRail(DATA.today);
   renderCards();
   renderMainChart();
