@@ -47,10 +47,7 @@ body.locked { overflow: hidden; }
 header.top { padding-top: 24px; padding-bottom: 8px; }
 .top-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
-.mark { width: 36px; height: 36px; flex: none; }
-.mark rect { fill: var(--accent); }
-.mark path { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.word { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.word { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
 .word span { color: var(--accent); }
 .tagline { color: var(--muted); margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
@@ -208,7 +205,6 @@ footer.wrap { color: var(--muted); font-size: 12px; padding-top: 32px; padding-b
   .verdict { grid-column: 2; grid-row: 1 / span 2; }
   .chev { grid-column: 3; grid-row: 1 / span 2; }
   .word { font-size: 22px; }
-  .mark { width: 32px; height: 32px; }
   .how-grid { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .game { flex-basis: 78%; }
