@@ -42,3 +42,18 @@ def run_log(conn: psycopg.Connection, job: str):
         (state["credits_used"], state["credits_remaining"], Jsonb(state["notes"]), run_id),
     )
     conn.commit()
+
+
+def already_ran(conn: psycopg.Connection, job: str, since_sql: str) -> bool:
+    """True if `job` already succeeded since the given SQL time expression.
+
+    Jobs are triggered by both an outside timer and GitHub's own (late) schedule,
+    so this keeps the second trigger from spending odds credits again.
+    Set FORCE=1 to run anyway.
+    """
+    if os.environ.get("FORCE", "").lower() in ("1", "true", "yes"):
+        return False
+    row = conn.execute(
+        f"select 1 from runs where job = %s and status = 'ok' and started_at >= {since_sql} limit 1", (job,)
+    ).fetchone()
+    return row is not None

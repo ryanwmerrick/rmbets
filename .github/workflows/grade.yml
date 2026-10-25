@@ -2,8 +2,8 @@ name: Grade results
 
 on:
   schedule:
-    - cron: "*/30 17-23 * * *"   # every 30 min, 1-7:30pm EDT / 12-6:30pm EST
-    - cron: "*/30 0-6 * * *"     # every 30 min, 8pm-2:30am EDT / 7pm-1:30am EST
+    - cron: "7,37 17-23 * * *"   # every 30 min, 1-7:30pm EDT / 12-6:30pm EST
+    - cron: "7,37 0-6 * * *"     # every 30 min, 8pm-2:30am EDT / 7pm-1:30am EST
   workflow_dispatch:
 
 permissions:

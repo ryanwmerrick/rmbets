@@ -14,6 +14,10 @@ from .common import insert_snapshots, save_decisions, upsert_game
 
 def main() -> None:
     conn = db.connect()
+    # Midnight ET today, as a timestamp
+    if db.already_ran(conn, "daily", "(date_trunc('day', now() at time zone 'America/New_York') at time zone 'America/New_York')"):
+        print("[skip] today's picks already ran (set FORCE=1 to run again)")
+        return
     api = OddsAPI()
     ai = AIAnalyst()
     with db.run_log(conn, "daily") as state:

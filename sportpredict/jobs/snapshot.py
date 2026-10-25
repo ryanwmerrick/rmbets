@@ -14,6 +14,9 @@ API_KEY_FOR = {league: key for key, league in config.LEAGUES.items()}
 
 def main() -> None:
     conn = db.connect()
+    if db.already_ran(conn, "snapshot", "now() - interval '3 hours'"):
+        print("[skip] a snapshot already ran in the last 3 hours (set FORCE=1 to run again)")
+        return
     api = OddsAPI()
     with db.run_log(conn, "snapshot") as state:
         now = datetime.now(timezone.utc)

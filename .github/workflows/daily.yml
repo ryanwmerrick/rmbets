@@ -1,9 +1,19 @@
 name: Daily picks
 
 on:
+  # GitHub often starts scheduled jobs late, so there are three attempts an hour
+  # apart (off the busy :00/:30 marks). The first one to start makes the picks;
+  # later ones see it already ran today and exit without spending odds credits.
   schedule:
-    - cron: "0 14 * * *"   # 10am EDT / 9am EST: grade, snapshot odds, make picks
+    - cron: "17 12 * * *"   # 8:17am EDT / 7:17am EST
+    - cron: "17 13 * * *"   # 9:17am EDT / 8:17am EST
+    - cron: "17 14 * * *"   # 10:17am EDT / 9:17am EST
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even if today's picks already ran (spends odds credits again)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,6 +35,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      FORCE: ${{ inputs.force }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

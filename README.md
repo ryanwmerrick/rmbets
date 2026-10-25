@@ -17,9 +17,9 @@ Results are scored on ROI, closing line value (CLV), and for the AI, a Brier sco
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `daily.yml` | 14:00 UTC | Grades finished games from ESPN's scoreboard, snapshots odds for leagues playing that day, runs every portfolio, publishes the dashboard |
-| `snapshot.yml` | 21:30 UTC daily, 16:15 UTC Sundays | Moneyline snapshot near game time for CLV, then publishes the dashboard |
-| `grade.yml` | Every 30 min, 1pm-2:30am ET | Grades finished games from ESPN (no odds credits) and republishes when anything changed |
+| `daily.yml` | 12:17, 13:17, 14:17 UTC (first to start wins) | Grades finished games from ESPN's scoreboard, snapshots odds for leagues playing that day, runs every portfolio, publishes the dashboard |
+| `snapshot.yml` | 20:17 and 21:47 UTC (first to start wins), 16:13 UTC Sundays | Moneyline snapshot near game time for CLV, then publishes the dashboard |
+| `grade.yml` | :07 and :37 past each hour, 1pm-2:30am ET | Grades finished games from ESPN (no odds credits) and republishes when anything changed |
 | `pages.yml` | Push to `web/` | Republishes the dashboard |
 
 - **Database:** Neon Postgres, schema `sportpredict` (`db/001_init.sql`).
@@ -34,6 +34,8 @@ pytest -q tests
 python -m sportpredict.jobs.daily      # ~3 Odds API credits per league with games that day
 python -m sportpredict.jobs.export site/data.json && cp web/* site/ && python -m http.server -d site
 ```
+
+GitHub often starts scheduled jobs late, so picks and snapshots have backup attempts. A job that already succeeded (today for picks, in the last 3 hours for snapshots) exits without spending credits. Use **Run workflow → force** to run one again on purpose.
 
 ## Odds API credits
 
