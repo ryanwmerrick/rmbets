@@ -153,7 +153,7 @@ function renderRail(today) {
   const bets = RAIL_ORDER.flatMap((s) => today.filter((b) => b.strategy === s).sort((x, y) => x.commence_time.localeCompare(y.commence_time)));
   $("today-count").textContent = bets.length ? "Tap a card to see why" : "";
   if (!bets.length) {
-    $("rail").innerHTML = `<div class="none">No AI or Market EV bets yet today. Picks post in the morning, usually 8–10 AM ET, and these two only bet when they find an edge.</div>`;
+    $("rail").innerHTML = `<div class="none">No AI or Market EV bets yet today. Picks post at 8:30 AM ET, and these two only bet when they find an edge.</div>`;
     return;
   }
   $("rail").innerHTML = bets.map(gameCard).join("");
@@ -400,7 +400,7 @@ function route() {
 }
 
 // ---------- Status line: when each job last ran ----------
-const DAILY_UTC = [12, 17];  // first morning attempt (hour, minute); keep in sync with .github/workflows/daily.yml
+const PICKS_ET = [8, 30];  // keep in sync with sportpredict/jobs/gate.py
 
 function renderStatus(rows) {
   const by = Object.fromEntries((rows || []).map((r) => [r.job, r]));
@@ -410,14 +410,19 @@ function renderStatus(rows) {
   const item = (label, r) => r
     ? `<span class="st"><span class="st-dot ${r.status}"></span>${label} ${when(r.at)}</span>`
     : `<span class="st"><span class="st-dot"></span>${label} –</span>`;
-  const next = new Date();
-  next.setUTCHours(DAILY_UTC[0], DAILY_UTC[1], 0, 0);
-  if (next <= new Date()) next.setUTCDate(next.getUTCDate() + 1);
+  // Next picks: today at 8:30 ET if that's still ahead and not done yet, otherwise tomorrow
+  const nowET = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const doneToday = by.daily && et(by.daily.at, { year: "numeric", month: "numeric", day: "numeric" }) ===
+    nowET.toLocaleDateString("en-US", { year: "numeric", month: "numeric", day: "numeric" });
+  const beforeTarget = nowET.getHours() * 60 + nowET.getMinutes() < PICKS_ET[0] * 60 + PICKS_ET[1];
+  const nextDay = new Date(nowET);
+  if (doneToday || !beforeTarget) nextDay.setDate(nextDay.getDate() + 1);
+  const nextLabel = (doneToday || !beforeTarget) ? nextDay.toLocaleDateString("en-US", { weekday: "short" }) : "Today";
   $("status").innerHTML = [
     item("Picks", by.daily),
     item("Odds check", by.snapshot),
     item("Results", results),
-    `<span class="st muted">Next picks ${et(next.toISOString(), { weekday: "short" })} morning</span>`,
+    `<span class="st muted">Next picks ${nextLabel} 8:30 AM</span>`,
   ].join("");
 }
 

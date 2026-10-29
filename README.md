@@ -17,8 +17,8 @@ Results are scored on ROI, closing line value (CLV), and for the AI, a Brier sco
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `daily.yml` | 12:17, 13:17, 14:17 UTC (first to start wins) | Grades finished games from ESPN's scoreboard, snapshots odds for leagues playing that day, runs every portfolio, publishes the dashboard |
-| `snapshot.yml` | 20:17 and 21:47 UTC (first to start wins), 16:13 UTC Sundays | Moneyline snapshot near game time for CLV, then publishes the dashboard |
+| `daily.yml` | 9 overnight attempts; the first waits until 8:30 AM ET | Grades finished games from ESPN's scoreboard, snapshots odds for leagues playing that day, runs every portfolio, publishes the dashboard |
+| `snapshot.yml` | 9 daytime attempts; the first waits until 4:45 PM ET (and 12:30 PM Sundays) | Moneyline snapshot near game time for CLV, then publishes the dashboard |
 | `grade.yml` | :07 and :37 past each hour, 1pm-2:30am ET | Grades finished games from ESPN (no odds credits) and republishes when anything changed |
 | `pages.yml` | Push to `web/` | Republishes the dashboard |
 
@@ -35,7 +35,7 @@ python -m sportpredict.jobs.daily      # ~3 Odds API credits per league with gam
 python -m sportpredict.jobs.export site/data.json && cp web/* site/ && python -m http.server -d site
 ```
 
-GitHub often starts scheduled jobs late, so picks and snapshots have backup attempts. A job that already succeeded (today for picks, in the last 3 hours for snapshots) exits without spending credits. Use **Run workflow → force** to run one again on purpose.
+GitHub starts scheduled jobs anywhere from minutes to ~6 hours late, so picks and snapshots are scheduled many times. The first attempt to start waits (`sportpredict/jobs/gate.py`) until the target time and runs the job; the rest find it done and exit without spending credits. **Run workflow** starts a job immediately; tick **force** to repeat one that already ran.
 
 ## Odds API credits
 
